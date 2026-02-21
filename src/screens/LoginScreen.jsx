@@ -1,0 +1,212 @@
+import React, { useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  SafeAreaView, ScrollView, KeyboardAvoidingView, Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+export default function LoginScreen({ navigation, route }) {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState(route.params?.role === 'employer' ? 'Employer' : '');
+  const [aboutMe, setAboutMe] = useState(''); // New field
+  const [jobType, setJobType] = useState('Full-time');
+  const [searchTarget, setSearchTarget] = useState(''); // Employer specific
+
+  const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    navigation.reset({
+      index: 0,
+      routes: [{ 
+        name: 'Main', 
+        params: { 
+          userName: name.trim(), 
+          userRole: role.trim() || (isEmployer ? 'Employer' : 'Professional'), 
+          jobType,
+          aboutMe,
+          searchTarget,
+          userType: isEmployer ? 'employer' : 'seeker'
+        } 
+      }],
+    });
+  };
+
+  const isEmployer = route.params?.role === 'employer';
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.title}>
+            {isEmployer ? "Find elite talent\nin 10 seconds." : "Your profile\nin 10 seconds."}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isEmployer ? "No long recruitment cycles." : "No CV uploads. No long forms."}
+          </Text>
+
+          <View style={styles.group}>
+            <Text style={styles.label}>FULL NAME</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Jordan Lee"
+              placeholderTextColor="#ABABC0"
+              value={name}
+              onChangeText={setName}
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.group}>
+            <Text style={styles.label}>{isEmployer ? "COMPANY NAME" : "CURRENT ROLE"}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={isEmployer ? "e.g. Acme Inc" : "e.g. UX Designer"}
+              placeholderTextColor="#ABABC0"
+              value={role}
+              onChangeText={setRole}
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.group}>
+            <Text style={styles.label}>ABOUT {isEmployer ? "COMPANY" : "YOU"}</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder={isEmployer ? "Briefly describe your company..." : "Tell us a bit about yourself..."}
+              placeholderTextColor="#ABABC0"
+              value={aboutMe}
+              onChangeText={setAboutMe}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          {isEmployer ? (
+            <View style={styles.group}>
+              <Text style={styles.label}>WHAT DO YOU WANT TO FIND?</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Senior Frontend Engineer"
+                placeholderTextColor="#ABABC0"
+                value={searchTarget}
+                onChangeText={setSearchTarget}
+              />
+            </View>
+          ) : (
+            <View style={styles.group}>
+              <Text style={styles.label}>I'M LOOKING FOR</Text>
+              <View style={styles.pillRow}>
+                {jobTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[styles.typePill, jobType === type && styles.typePillActive]}
+                    onPress={() => setJobType(type)}
+                  >
+                    <Text style={[styles.typePillText, jobType === type && styles.typePillTextActive]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85}>
+            <LinearGradient colors={['#6C5CE7', '#A29BFE']} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={styles.ctaText}>Let's Go ✨</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or sign up with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity style={styles.socialBtn}>
+            <Text style={styles.socialIcon}>G</Text>
+            <Text style={styles.socialText}>Continue with Google</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  scroll: { paddingHorizontal: 28, paddingTop: 60, paddingBottom: 40, gap: 20 },
+  backBtn: {
+    width: 40, height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8,
+    elevation: 3,
+  },
+  backArrow: { 
+    fontSize: 22, 
+    color: '#1A1A2E',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: -2, // Fine-tuning vertical alignment
+    marginLeft: -2, // Fine-tuning horizontal alignment
+  },
+  title: { fontSize: 30, fontWeight: '800', color: '#1A1A2E', lineHeight: 38 },
+  subtitle: { fontSize: 14, color: '#9898B0', marginTop: -8 },
+  group: { gap: 8 },
+  label: { fontSize: 11, fontWeight: '700', color: '#555572', letterSpacing: 0.8 },
+  input: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.08)',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1A1A2E',
+  },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typePill: {
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 40, borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: '#fff',
+  },
+  typePillActive: { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
+  typePillText: { fontSize: 13, fontWeight: '600', color: '#555572' },
+  typePillTextActive: { color: '#fff' },
+  cta: { borderRadius: 18, paddingVertical: 17, alignItems: 'center', marginTop: 4 },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  dividerText: { fontSize: 12, color: '#9898B0' },
+  socialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.08)',
+    paddingVertical: 15,
+  },
+  socialIcon: { fontSize: 16, fontWeight: '900', color: '#4285F4' },
+  socialText: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 14,
+  },
+});
