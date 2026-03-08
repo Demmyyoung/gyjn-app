@@ -30,8 +30,8 @@ export default function BottomNavBar({ activeIndex, onTabPress }) {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.tab} onPress={() => onTabPress(2)}>
-        <Text style={[styles.icon, activeIndex === 2 && styles.activeText]}>💼</Text>
-        <Text style={[styles.label, activeIndex === 2 && styles.activeText]}>Discover</Text>
+        <Text style={[styles.icon, activeIndex === 2 && styles.activeText]}>👤</Text>
+        <Text style={[styles.label, activeIndex === 2 && styles.activeText]}>Profile</Text>
       </TouchableOpacity>
     </View>
   );
@@ -58,19 +58,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#9898B0',
+    color: '#ABABAB',
     marginTop: 3,
   },
   activeText: {
-    color: '#6C5CE7',
+    color: '#AB6453',
   },
   highlight: {
     position: 'absolute',
     top: 5,
-    left: (TAB_WIDTH - 60) / 2, // Centering 60px highlight in tab
+    left: (TAB_WIDTH - 60) / 2,
     width: 60,
     height: 44,
-    backgroundColor: 'rgba(108,92,231,0.08)',
-    borderRadius: 14,
+    backgroundColor: 'rgba(171,100,83,0.08)',
+    borderRadius: 30,
   }
 });

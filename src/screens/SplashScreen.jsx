@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -34,7 +33,7 @@ export default function SplashScreen({ navigation }) {
   });
 
   return (
-    <LinearGradient colors={['#6C5CE7', '#A29BFE']} style={styles.container}>
+    <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity, transform: [{ scale }] }]}>
         <View style={styles.iconBox}>
           <Text style={styles.icon}>💼</Text>
@@ -46,7 +45,7 @@ export default function SplashScreen({ navigation }) {
       <View style={styles.loaderTrack}>
         <Animated.View style={[styles.loaderBar, { width: barWidth }]} />
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -55,6 +54,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
   },
   content: {
     alignItems: 'center',
@@ -64,23 +64,23 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(171,100,83,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(171,100,83,0.2)',
     marginBottom: 4,
   },
   icon: { fontSize: 48 },
   wordmark: {
     fontSize: 46,
     fontWeight: '900',
-    color: '#fff',
+    color: '#1A1A1A',
     letterSpacing: -1,
   },
   tagline: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+    color: '#ABABAB',
     fontWeight: '600',
     letterSpacing: 3,
   },
@@ -89,13 +89,13 @@ const styles = StyleSheet.create({
     bottom: 80,
     width: 60,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(26,26,26,0.1)',
     borderRadius: 10,
     overflow: 'hidden',
   },
   loaderBar: {
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#AB6453',
     borderRadius: 10,
   },
 });

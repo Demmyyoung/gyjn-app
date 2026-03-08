@@ -14,6 +14,8 @@ export default function LoginScreen({ navigation, route }) {
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 
+  const isEmployer = route.params?.role === 'employer';
+
   const handleSubmit = () => {
     if (!name.trim()) return;
     navigation.reset({
@@ -31,8 +33,6 @@ export default function LoginScreen({ navigation, route }) {
       }],
     });
   };
-
-  const isEmployer = route.params?.role === 'employer';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,7 +57,7 @@ export default function LoginScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="e.g. Jordan Lee"
-              placeholderTextColor="#ABABC0"
+              placeholderTextColor="#ABABAB"
               value={name}
               onChangeText={setName}
               autoCorrect={false}
@@ -69,7 +69,7 @@ export default function LoginScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder={isEmployer ? "e.g. Acme Inc" : "e.g. UX Designer"}
-              placeholderTextColor="#ABABC0"
+              placeholderTextColor="#ABABAB"
               value={role}
               onChangeText={setRole}
               autoCorrect={false}
@@ -81,7 +81,7 @@ export default function LoginScreen({ navigation, route }) {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder={isEmployer ? "Briefly describe your company..." : "Tell us a bit about yourself..."}
-              placeholderTextColor="#ABABC0"
+              placeholderTextColor="#ABABAB"
               value={aboutMe}
               onChangeText={setAboutMe}
               multiline
@@ -95,7 +95,7 @@ export default function LoginScreen({ navigation, route }) {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Senior Frontend Engineer"
-                placeholderTextColor="#ABABC0"
+                placeholderTextColor="#ABABAB"
                 value={searchTarget}
                 onChangeText={setSearchTarget}
               />
@@ -120,7 +120,7 @@ export default function LoginScreen({ navigation, route }) {
           )}
 
           <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85}>
-            <LinearGradient colors={['#6C5CE7', '#A29BFE']} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={['#AB6453', '#C4795D']} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Text style={styles.ctaText}>Let's Go ✨</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -156,16 +156,16 @@ const styles = StyleSheet.create({
   },
   backArrow: { 
     fontSize: 22, 
-    color: '#1A1A2E',
+    color: '#1A1A1A',
     textAlign: 'center',
     lineHeight: 22,
     marginTop: -2, // Fine-tuning vertical alignment
     marginLeft: -2, // Fine-tuning horizontal alignment
   },
-  title: { fontSize: 30, fontWeight: '800', color: '#1A1A2E', lineHeight: 38 },
-  subtitle: { fontSize: 14, color: '#9898B0', marginTop: -8 },
+  title: { fontSize: 30, fontWeight: '800', color: '#1A1A1A', lineHeight: 38 },
+  subtitle: { fontSize: 14, color: '#ABABAB', marginTop: -8 },
   group: { gap: 8 },
-  label: { fontSize: 11, fontWeight: '700', color: '#555572', letterSpacing: 0.8 },
+  label: { fontSize: 11, fontWeight: '700', color: '#6B6B6B', letterSpacing: 0.8 },
   input: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#1A1A2E',
+    color: '#1A1A1A',
   },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typePill: {
@@ -183,14 +183,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.1)',
     backgroundColor: '#fff',
   },
-  typePillActive: { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
-  typePillText: { fontSize: 13, fontWeight: '600', color: '#555572' },
+  typePillActive: { backgroundColor: '#AB6453', borderColor: '#AB6453' },
+  typePillText: { fontSize: 13, fontWeight: '600', color: '#6B6B6B' },
   typePillTextActive: { color: '#fff' },
   cta: { borderRadius: 18, paddingVertical: 17, alignItems: 'center', marginTop: 4 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  dividerText: { fontSize: 12, color: '#9898B0' },
+  dividerText: { fontSize: 12, color: '#ABABAB' },
   socialBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   socialIcon: { fontSize: 16, fontWeight: '900', color: '#4285F4' },
-  socialText: { fontSize: 14, fontWeight: '600', color: '#1A1A2E' },
+  socialText: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
   textArea: {
     height: 100,
     textAlignVertical: 'top',

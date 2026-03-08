@@ -2,11 +2,10 @@ import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnboardingScreen({ navigation }) {
   return (
-    <LinearGradient colors={['#6C5CE7', '#A29BFE']} style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.inner}>
         <View style={styles.header}>
           <Text style={styles.title}>You're almost{'\n'}in. 🚀</Text>
@@ -41,12 +40,12 @@ export default function OnboardingScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   inner: {
     flex: 1,
     paddingHorizontal: 28,
@@ -57,27 +56,30 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 34,
     fontWeight: '800',
-    color: '#fff',
+    color: '#1A1A1A',
     lineHeight: 42,
   },
   subtitle: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.75)',
+    color: '#ABABAB',
     lineHeight: 22,
   },
   cards: { gap: 16 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 22,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   cardEmoji: { fontSize: 34 },
-  cardTextContainer: { flex: 1 }, // Added this
-  cardLabel: { fontSize: 17, fontWeight: '700', color: '#fff', marginBottom: 3 },
-  cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.72)' },
+  cardTextContainer: { flex: 1 },
+  cardLabel: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 3 },
+  cardDesc: { fontSize: 13, color: '#6B6B6B' },
 });

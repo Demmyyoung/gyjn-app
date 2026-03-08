@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   matchText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6C5CE7',
+    color: '#AB6453',
   },
   body: {
     padding: 20,
@@ -101,13 +101,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#9898B0',
+    color: '#ABABAB',
     letterSpacing: 1,
     marginBottom: 8,
   },
   bio: {
     fontSize: 15,
-    color: '#555572',
+    color: '#6B6B6B',
     lineHeight: 22,
     marginBottom: 16,
   },
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skillChip: {
-    backgroundColor: 'rgba(108,92,231,0.08)',
+    backgroundColor: 'rgba(171,100,83,0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
