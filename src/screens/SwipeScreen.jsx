@@ -18,13 +18,28 @@ const SWIPE_THRESHOLD = 120;
 const RISE_DISTANCE = 24;
 const CARD_HEIGHT = 420;
 
+const C = {
+  orange:  '#FF6B2C',   // primary CTA, logo, apply action, salary text
+  mango:   '#FF9A62',   // hover states, secondary orange
+  peach:   '#FFE0CC',   // pill backgrounds, light fills
+  cream:   '#FFF5EE',   // app background (replaces #F2F0ED and #F5F5F5)
+  purple:  '#7B4FE9',   // match celebration, premium badges
+  gold:    '#FFD23F',   // save action, streaks (replaces #FFD60A)
+  night:   '#1A1A2E',   // text, dark card headers (replaces #1A1A1A)
+  sand:    '#F2EDE8',   // card body background
+  green:   '#00C896',   // apply overlay, success (replaces #30D158)
+  red:     '#FF4757',   // skip overlay, destructive (replaces #FF3B30)
+  muted:   '#5A5A7A',   // body text (replaces #6B6B6B)
+  hint:    '#BEBEBE',   // placeholder, hint text
+};
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const TAG_COLORS = {
-  green:   { bg: 'rgba(186,219,148,0.15)', text: '#5A8C2E' },
-  gold:    { bg: 'rgba(255,190,118,0.15)', text: '#E17A14' },
-  purple:  { bg: 'rgba(171,100,83,0.08)',  text: '#AB6453' },
-  default: { bg: '#F0F0F0',                text: '#6B6B6B' },
+  green:   { bg: 'rgba(0, 200, 150, 0.12)', text: C.green }, // apply-green
+  gold:    { bg: 'rgba(255, 210, 63, 0.12)', text: C.gold }, // wish-gold
+  purple:  { bg: 'rgba(123, 79, 233, 0.12)', text: C.purple }, // lamp-purple
+  default: { bg: C.peach,                text: C.muted }, // peach background
 };
 
 function Tag({ label, type }) {
@@ -54,7 +69,7 @@ function JobCard({ job, onPress }) {
       <View style={styles.cardBottom}>
         <Text style={styles.cardCompany}>{job.company}</Text>
         <Text style={styles.cardRole}>{job.role}</Text>
-        <Text style={styles.cardSalary}>{job.salary} / yr</Text>
+        <Text style={styles.cardSalary}>{job.salary} / mo</Text>
       </View>
     </TouchableOpacity>
   );
@@ -77,11 +92,16 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
     // Background card rises + scales as user drags the top card
     const dist = Math.sqrt(translateX.value ** 2 + translateY.value ** 2);
     const progress = Math.min(1, dist / SWIPE_THRESHOLD);
+    
+    // Scale: 1.0 (top) down to ~0.84 (5th card)
     const baseScale = 1 - stackIndex * 0.04;
+    // translateY: 0 (top) down and back to 120 (5th card)
+    const baseTranslateY = stackIndex * RISE_DISTANCE;
+
     return {
       transform: [
         { scale: interpolate(progress, [0, 1], [baseScale, baseScale + 0.04]) },
-        { translateY: interpolate(progress, [0, 1], [stackIndex * RISE_DISTANCE, (stackIndex - 1) * RISE_DISTANCE]) },
+        { translateY: interpolate(progress, [0, 1], [baseTranslateY, baseTranslateY - RISE_DISTANCE]) },
       ],
     };
   });
@@ -89,6 +109,8 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
   return (
     <Animated.View
       style={[styles.cardWrapper, animStyle, { zIndex: 100 - stackIndex, opacity: isPreload ? 0 : 1 }]}
+      renderToHardwareTextureAndroid={true}
+      shouldRasterizeIOS={true}
     >
       <JobCard job={job} onPress={isTop ? onPress : undefined} />
     </Animated.View>
@@ -98,18 +120,19 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
 // ─── LeavingCard ────────────────────────────────────────────────────────────
 
 function LeavingCard({ item, onComplete }) {
-  const { job, startX, startY, direction, vx, vy } = item;
-  const posX = useSharedValue(startX);
+  const { job, direction, startX = 0, startY = 0 } = item;
+  const posX = useSharedValue(startX); 
   const posY = useSharedValue(startY);
 
   useEffect(() => {
-    const targetX = direction === 'right' ? SCREEN_W * 1.5 : direction === 'left' ? -SCREEN_W * 1.5 : vx * 400;
-    const targetY = direction === 'down' ? SCREEN_H * 1.5 : vy * 400;
+    const targetX = direction === 'right' ? SCREEN_W * 1.5 : direction === 'left' ? -SCREEN_W * 1.5 : 0;
+    const targetY = direction === 'down' ? SCREEN_H * 1.3 : 0;
+
     posX.value = withTiming(targetX, { duration: 350 });
     posY.value = withTiming(targetY, { duration: 350 }, (finished) => {
       if (finished) runOnJS(onComplete)();
     });
-  }, []);
+  }, [direction, onComplete]);
 
   const style = useAnimatedStyle(() => ({
     transform: [
@@ -120,7 +143,12 @@ function LeavingCard({ item, onComplete }) {
   }));
 
   return (
-    <Animated.View style={[styles.cardWrapper, style, { zIndex: 200 }]} pointerEvents="none">
+    <Animated.View 
+      style={[styles.cardWrapper, style, { zIndex: 200 }]} 
+      pointerEvents="none"
+      renderToHardwareTextureAndroid={true}
+      shouldRasterizeIOS={true}
+    >
       <JobCard job={job} />
     </Animated.View>
   );
@@ -129,60 +157,99 @@ function LeavingCard({ item, onComplete }) {
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
-  const [jobs, setJobs] = useState(JOBS.slice(0, 10));
+  const [jobs, setJobs] = useState(JOBS);
   const [showDetail, setShowDetail] = useState(false);
   const [detailJob, setDetailJob] = useState(null);
   const [exitingCards, setExitingCards] = useState([]);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const { userName } = route.params || { userName: 'Professional' };
 
-  // Called on the JS thread after a successful swipe gesture
-  const handleSwipeComplete = useCallback((direction, currentX, currentY, vx, vy) => {
-    const topJob = jobs[0];
+  // Called after a successful swipe animation completes
+  const handleSwipeComplete = useCallback((direction) => {
+    // FIX: Look up the job on the JS thread where state is always fresh
+    const topJob = jobs[0]; 
     if (!topJob) return;
 
-    setExitingCards(prev => [...prev, {
-      id: Date.now() + Math.random(),
-      job: topJob, startX: currentX, startY: currentY, direction, vx, vy,
+    // Capture current trajectory before resetting shared values
+    const currentX = translateX.value;
+    const currentY = translateY.value;
+
+    // Handoff to exiting state for smooth flight
+    setExitingCards(prev => [...prev, { 
+      id: `${topJob.id}-exiting-${Date.now()}`, 
+      job: topJob, 
+      direction,
+      startX: currentX,
+      startY: currentY
     }]);
 
     setJobs(prev => {
+      // Filter out the top job (slice is safer here)
       const remaining = prev.slice(1);
-      if (remaining.length <= 2) {
-        return [...remaining, ...JOBS.map(j => ({ ...j, id: `${j.id}-${Date.now()}` }))];
+      
+      // FIX: Maintain a "deep" buffer of 15 items to ensure 5 are always drawable
+      if (remaining.length < 10) {
+        const refill = JOBS.map(j => ({ 
+          ...j, 
+          id: `${j.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` 
+        }));
+        return [...remaining, ...refill];
       }
       return remaining;
     });
 
+    // Reset shared values for the NEW top card immediately
     translateX.value = 0;
     translateY.value = 0;
 
     if (direction === 'right') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (onMatchLand) setTimeout(() => onMatchLand(topJob), 350);
+      if (onMatchLand) onMatchLand(topJob);
     }
-  }, [jobs, onMatchLand]);
+  }, [jobs, onMatchLand, translateX, translateY]);
 
-  // ── Gesture ───────────────────────────────────────────────────────────────
+  const hasTriggeredHaptic = useSharedValue(false);
+
   const gesture = Gesture.Pan()
-    .minDistance(10)
+    .minDistance(8)
     .onUpdate((e) => {
       translateX.value = e.translationX;
-      translateY.value = e.translationY * 0.5;
+      translateY.value = e.translationY * 0.4;
+
+      const THRESHOLD = 100;
+      const isOver = Math.abs(translateX.value) > THRESHOLD || translateY.value > THRESHOLD;
+      
+      if (isOver && !hasTriggeredHaptic.value) {
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+        hasTriggeredHaptic.value = true;
+      } else if (!isOver && hasTriggeredHaptic.value) {
+        hasTriggeredHaptic.value = false;
+      }
     })
     .onEnd((e) => {
-      const isDown  = e.translationY > SWIPE_THRESHOLD && Math.abs(e.translationY) > Math.abs(e.translationX);
-      const isRight = e.translationX > SWIPE_THRESHOLD;
-      const isLeft  = e.translationX < -SWIPE_THRESHOLD;
+      'worklet';
+      const THRESHOLD = 120;
+      const isDown  = translateY.value > THRESHOLD && translateY.value > Math.abs(translateX.value);
+      const isRight = translateX.value > THRESHOLD && !isDown;
+      const isLeft  = translateX.value < -THRESHOLD && !isDown;
 
       if (isRight || isLeft || isDown) {
         const dir = isDown ? 'down' : isRight ? 'right' : 'left';
-        runOnJS(handleSwipeComplete)(dir, e.translationX, e.translationY * 0.5, e.velocityX / 1000, e.velocityY / 1000);
+        const targetX = isRight ? SCREEN_W * 1.5 : isLeft ? -SCREEN_W * 1.5 : 0;
+        const targetY = isDown ? SCREEN_H * 1.5 : 0;
+        
+        translateX.value = withTiming(targetX, { duration: 300 });
+        translateY.value = withTiming(targetY, { duration: 300 }, (finished) => {
+          if (finished) {
+            runOnJS(handleSwipeComplete)(dir);
+          }
+        });
       } else {
         translateX.value = withSpring(0, { damping: 15, stiffness: 150 });
         translateY.value = withSpring(0, { damping: 15, stiffness: 150 });
       }
+      hasTriggeredHaptic.value = false;
     });
 
   const removeExitingCard = useCallback((id) => {
@@ -196,11 +263,18 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   }, [jobs]);
 
   const triggerSwipe = useCallback((dir) => {
-    handleSwipeComplete(dir, dir === 'right' ? SCREEN_W : -SCREEN_W, 0, 0, 0);
+    // For trigger buttons or programmatic swipes
+    const targetX = dir === 'right' ? SCREEN_W * 1.5 : dir === 'left' ? -SCREEN_W * 1.5 : 0;
+    const targetY = dir === 'down' ? SCREEN_H * 1.5 : 0;
+    
+    translateX.value = withTiming(targetX, { duration: 400 });
+    translateY.value = withTiming(targetY, { duration: 400 }, (finished) => {
+      if (finished) runOnJS(handleSwipeComplete)(dir);
+    });
   }, [handleSwipeComplete]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const VISIBLE_COUNT = 3;
+  const VISIBLE_COUNT = 5;
   const renderCount = Math.min(jobs.length, VISIBLE_COUNT + 1);
   const insets = useSafeAreaInsets();
 
@@ -237,7 +311,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       {/* Header — logo center, filter right */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={{ width: 40 }} />
-        <Text style={styles.logo}>GYJN</Text>
+        <Text style={styles.logo}>Jinni</Text>
         <TouchableOpacity style={styles.filterBtn}>
           <Text style={styles.filterIcon}>☰</Text>
         </TouchableOpacity>
@@ -247,11 +321,11 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       <View style={styles.deck}>
         {jobs.length === 0 ? (
           <View style={styles.emptyDeck}>
-            <Text style={styles.emptyIcon}>💤</Text>
-            <Text style={styles.emptyTitle}>You've seen them all!</Text>
-            <Text style={styles.emptySubtitle}>New roles are added daily.</Text>
+            <Text style={styles.emptyIcon}>🧞‍♂️</Text>
+            <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
+            <Text style={styles.emptySubtitle}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
             <TouchableOpacity style={styles.reloadBtn} onPress={() => setJobs([...JOBS])}>
-              <Text style={styles.reloadBtnText}>Refresh Jobs ↺</Text>
+              <Text style={styles.reloadBtnText}>Refresh Wishes ↺</Text>
             </TouchableOpacity>
           </View>
         ) : renderCards()}
@@ -273,13 +347,13 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
               {detailJob?.tags.map((t, i) => <Tag key={i} label={t.label} type={t.type} />)}
             </View>
             <Text style={styles.sheetSectionLabel}>SALARY</Text>
-            <Text style={styles.sheetSalary}>{detailJob?.salary} / year</Text>
+            <Text style={styles.sheetSalary}>{detailJob?.salary} / mo</Text>
             <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
             <Text style={styles.sheetDesc}>{detailJob?.desc}</Text>
             <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
             {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
             <TouchableOpacity style={styles.sheetApply} onPress={() => { setShowDetail(false); triggerSwipe('right'); }}>
-              <Text style={styles.sheetApplyText}>Apply via GYJN →</Text>
+              <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -291,16 +365,16 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: C.cream },
 
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24, paddingTop: 8, paddingBottom: 12,
   },
-  logo: { fontSize: 22, fontWeight: '900', color: '#1A1A1A', letterSpacing: -0.5 },
+  logo: { fontSize: 22, fontWeight: '900', color: C.orange, letterSpacing: -0.5 },
   filterBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  filterIcon: { fontSize: 18, color: '#1A1A1A' },
+  filterIcon: { fontSize: 18, color: C.night },
 
   // Deck
   deck: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -308,10 +382,10 @@ const styles = StyleSheet.create({
 
   // Card — soft ambient shadow, no borders
   card: {
-    width: CARD_W, height: CARD_HEIGHT, borderRadius: 24, overflow: 'hidden',
+    width: CARD_W, height: CARD_HEIGHT, borderRadius: 28, overflow: 'hidden',
     backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04, shadowRadius: 12, elevation: 3,
+    shadowColor: C.night, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   cardTop: { flex: 1, justifyContent: 'space-between', padding: 20 },
   matchPill: {
@@ -322,30 +396,30 @@ const styles = StyleSheet.create({
   cardLogoWrap: { alignSelf: 'flex-start' },
   cardLogoBox: { width: 56, height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cardLogoEmoji: { fontSize: 28 },
-  cardBottom: { backgroundColor: '#1A1A1A', paddingHorizontal: 24, paddingVertical: 22, gap: 4 },
+  cardBottom: { backgroundColor: C.night, paddingHorizontal: 24, paddingVertical: 22, gap: 4 },
   cardCompany: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 1.2, textTransform: 'uppercase' },
   cardRole: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  cardSalary: { fontSize: 14, fontWeight: '600', color: '#AB6453', marginTop: 2 },
+  cardSalary: { fontSize: 14, fontWeight: '600', color: C.gold, marginTop: 2 },
 
   // Empty state
   emptyDeck: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40 },
   emptyIcon: { fontSize: 72, marginBottom: 8 },
-  emptyTitle: { fontSize: 22, fontWeight: '800', color: '#1A1A1A', textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, color: '#ABABAB', textAlign: 'center', lineHeight: 22 },
-  reloadBtn: { backgroundColor: '#AB6453', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 30, marginTop: 12 },
+  emptyTitle: { fontSize: 22, fontWeight: '800', color: C.night, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: C.hint, textAlign: 'center', lineHeight: 22 },
+  reloadBtn: { backgroundColor: C.orange, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 30, marginTop: 12 },
   reloadBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Detail sheet
   sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: SCREEN_H * 0.7 },
   sheetHandle: { width: 36, height: 4, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 10, alignSelf: 'center', marginBottom: 20 },
-  sheetRole: { fontSize: 22, fontWeight: '800', color: '#1A1A1A', marginBottom: 4 },
-  sheetCompany: { fontSize: 14, fontWeight: '600', color: '#AB6453', marginBottom: 14 },
-  sheetSectionLabel: { fontSize: 11, fontWeight: '700', color: '#ABABAB', letterSpacing: 0.8, marginTop: 18, marginBottom: 6 },
-  sheetSalary: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
-  sheetDesc: { fontSize: 14, color: '#6B6B6B', lineHeight: 22 },
-  sheetReq: { fontSize: 14, color: '#6B6B6B', marginBottom: 4, lineHeight: 22 },
-  sheetApply: { backgroundColor: '#AB6453', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 24 },
+  sheetRole: { fontSize: 22, fontWeight: '800', color: C.night, marginBottom: 4 },
+  sheetCompany: { fontSize: 14, fontWeight: '600', color: C.orange, marginBottom: 14 },
+  sheetSectionLabel: { fontSize: 11, fontWeight: '700', color: C.hint, letterSpacing: 0.8, marginTop: 18, marginBottom: 6 },
+  sheetSalary: { fontSize: 20, fontWeight: '800', color: C.night },
+  sheetDesc: { fontSize: 14, color: C.muted, lineHeight: 22 },
+  sheetReq: { fontSize: 14, color: C.muted, marginBottom: 4, lineHeight: 22 },
+  sheetApply: { backgroundColor: C.orange, paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 24 },
   sheetApplyText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   tag: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },

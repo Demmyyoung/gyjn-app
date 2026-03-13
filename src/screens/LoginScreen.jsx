@@ -1,37 +1,68 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, KeyboardAvoidingView, Platform,
+  SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const C = {
+  orange:  '#FF6B2C',
+  mango:   '#FF9A62',
+  peach:   '#FFE0CC',
+  cream:   '#FFF5EE',
+  night:   '#1A1A2E',
+  muted:   '#5A5A7A',
+  hint:    '#BEBEBE',
+};
+
+const DEFAULT_SKILLS = ['JavaScript', 'React', 'Figma', 'Python', 'TypeScript'];
 
 export default function LoginScreen({ navigation, route }) {
   const [name, setName] = useState('');
   const [role, setRole] = useState(route.params?.role === 'employer' ? 'Employer' : '');
-  const [aboutMe, setAboutMe] = useState(''); // New field
+  const [aboutMe, setAboutMe] = useState('');
   const [jobType, setJobType] = useState('Full-time');
-  const [searchTarget, setSearchTarget] = useState(''); // Employer specific
+  const [searchTarget, setSearchTarget] = useState('');
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
-
   const isEmployer = route.params?.role === 'employer';
 
-  const handleSubmit = () => {
-    if (!name.trim()) return;
+  const navigateToMain = (overrideName) => {
+    const resolvedName = overrideName || name.trim();
+    if (!resolvedName) return;
     navigation.reset({
       index: 0,
-      routes: [{ 
-        name: 'Main', 
-        params: { 
-          userName: name.trim(), 
-          userRole: role.trim() || (isEmployer ? 'Employer' : 'Professional'), 
+      routes: [{
+        name: 'Main',
+        params: {
+          userName: resolvedName,
+          userRole: role.trim() || (isEmployer ? 'Employer' : 'Professional'),
           jobType,
           aboutMe,
           searchTarget,
-          userType: isEmployer ? 'employer' : 'seeker'
-        } 
+          userType: isEmployer ? 'employer' : 'seeker',
+          // FIX: Pass stable skills so ProfileScreen doesn't randomise on every render
+          skills: DEFAULT_SKILLS,
+        }
       }],
     });
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    navigateToMain();
+  };
+
+  // FIX: Google sign-in handler — wired up and ready for real SDK (e.g. expo-auth-session)
+  const handleGoogleSignIn = () => {
+    // TODO: Replace this Alert with your actual Google OAuth flow, e.g.:
+    // import * as Google from 'expo-auth-session/providers/google';
+    // const [request, response, promptAsync] = Google.useAuthRequest({ ... });
+    Alert.alert(
+      'Google Sign-In',
+      'Connect your Google OAuth credentials in LoginScreen.jsx to enable this.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -46,10 +77,10 @@ export default function LoginScreen({ navigation, route }) {
           </TouchableOpacity>
 
           <Text style={styles.title}>
-            {isEmployer ? "Find elite talent\nin 10 seconds." : "Your profile\nin 10 seconds."}
+            {isEmployer ? "Find elite talent\nin 10 seconds." : "Make a wish.\nGet your job."}
           </Text>
           <Text style={styles.subtitle}>
-            {isEmployer ? "No long recruitment cycles." : "No CV uploads. No long forms."}
+            {isEmployer ? "No long recruitment cycles." : "Your profile in 10 seconds. No CVs."}
           </Text>
 
           <View style={styles.group}>
@@ -120,7 +151,7 @@ export default function LoginScreen({ navigation, route }) {
           )}
 
           <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85}>
-            <LinearGradient colors={['#AB6453', '#C4795D']} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Text style={styles.ctaText}>Let's Go ✨</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -131,7 +162,8 @@ export default function LoginScreen({ navigation, route }) {
             <View style={styles.dividerLine} />
           </View>
 
-          <TouchableOpacity style={styles.socialBtn}>
+          {/* FIX: Google button now has a real onPress handler */}
+          <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn} activeOpacity={0.8}>
             <Text style={styles.socialIcon}>G</Text>
             <Text style={styles.socialText}>Continue with Google</Text>
           </TouchableOpacity>
@@ -142,7 +174,7 @@ export default function LoginScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: C.cream },
   scroll: { paddingHorizontal: 28, paddingTop: 60, paddingBottom: 40, gap: 20 },
   backBtn: {
     width: 40, height: 40,
@@ -156,14 +188,14 @@ const styles = StyleSheet.create({
   },
   backArrow: { 
     fontSize: 22, 
-    color: '#1A1A1A',
+    color: C.night,
     textAlign: 'center',
     lineHeight: 22,
-    marginTop: -2, // Fine-tuning vertical alignment
-    marginLeft: -2, // Fine-tuning horizontal alignment
+    marginTop: -2,
+    marginLeft: -2,
   },
-  title: { fontSize: 30, fontWeight: '800', color: '#1A1A1A', lineHeight: 38 },
-  subtitle: { fontSize: 14, color: '#ABABAB', marginTop: -8 },
+  title: { fontSize: 30, fontWeight: '800', color: C.night, lineHeight: 38 },
+  subtitle: { fontSize: 14, color: C.hint, marginTop: -8 },
   group: { gap: 8 },
   label: { fontSize: 11, fontWeight: '700', color: '#6B6B6B', letterSpacing: 0.8 },
   input: {
@@ -183,14 +215,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.1)',
     backgroundColor: '#fff',
   },
-  typePillActive: { backgroundColor: '#AB6453', borderColor: '#AB6453' },
-  typePillText: { fontSize: 13, fontWeight: '600', color: '#6B6B6B' },
+  typePillActive: { backgroundColor: C.orange, borderColor: C.orange },
+  typePillText: { fontSize: 13, fontWeight: '600', color: C.muted },
   typePillTextActive: { color: '#fff' },
   cta: { borderRadius: 18, paddingVertical: 17, alignItems: 'center', marginTop: 4 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
-  dividerText: { fontSize: 12, color: '#ABABAB' },
+  dividerText: { fontSize: 12, color: C.hint },
   socialBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,7 +235,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   socialIcon: { fontSize: 16, fontWeight: '900', color: '#4285F4' },
-  socialText: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
+  socialText: { fontSize: 14, fontWeight: '600', color: C.night },
   textArea: {
     height: 100,
     textAlignVertical: 'top',

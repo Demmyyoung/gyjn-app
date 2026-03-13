@@ -23,9 +23,9 @@ export default function MatchesScreen({ route, navigation }) {
         <Text style={styles.sectionLabel}>ALL MATCHES</Text>
         {matches.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💼</Text>
-            <Text style={styles.emptyTitle}>No matches yet</Text>
-            <Text style={styles.emptyHint}>Swipe right on jobs you love — when an employer likes you back, they'll appear here.</Text>
+            <Text style={styles.emptyIcon}>🧞‍♂️</Text>
+            <Text style={styles.emptyTitle}>No wishes granted yet</Text>
+            <Text style={styles.emptyHint}>Keep swiping on roles you love — when an employer grants your wish, they'll appear here.</Text>
           </View>
         ) : (
           <View style={styles.list}>
@@ -55,14 +55,14 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 28, fontWeight: '800', color: '#1A1A1A' },
   subtitle: { fontSize: 13, color: '#ABABAB', marginTop: 2 },
-  count: { fontWeight: '700', color: '#AB6453' },
+  count: { fontWeight: '700', color: '#FF6B2C' },
   scroll: { paddingHorizontal: 24, paddingBottom: 16 },
   sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: '#ABABAB', marginBottom: 12 },
 
   // Empty state
   emptyState: { alignItems: 'center', paddingVertical: 60, gap: 8 },
   emptyIcon: { fontSize: 56, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A' },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A2E' },
   emptyHint: { fontSize: 13, color: '#ABABAB', textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
 
   // List
@@ -75,13 +75,13 @@ const styles = StyleSheet.create({
   },
   listLogo: {
     width: 52, height: 52, borderRadius: 14,
-    backgroundColor: 'rgba(171,100,83,0.08)',
+    backgroundColor: 'rgba(255, 107, 44, 0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
   listInfo: { flex: 1 },
-  listRole: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
-  listCompany: { fontSize: 13, color: '#AB6453', fontWeight: '600', marginTop: 2 },
-  badge: { backgroundColor: '#1A1A1A', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeNew: { backgroundColor: '#AB6453' },
+  listRole: { fontSize: 16, fontWeight: '800', color: '#1A1A2E' },
+  listCompany: { fontSize: 13, color: '#FF6B2C', fontWeight: '600', marginTop: 2 },
+  badge: { backgroundColor: '#1A1A2E', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  badgeNew: { backgroundColor: '#FF6B2C' },
   badgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 });

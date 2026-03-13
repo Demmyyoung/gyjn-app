@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "gyjn-app",
-    "slug": "gyjn-app",
+    "name": "Jinni",
+    "slug": "jinni-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

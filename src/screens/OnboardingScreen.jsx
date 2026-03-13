@@ -3,6 +3,14 @@ import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
 
+const C = {
+  orange:  '#FF6B2C',
+  night:   '#1A1A2E',
+  cream:   '#FFF5EE',
+  hint:    '#BEBEBE',
+  muted:   '#5A5A7A',
+};
+
 export default function OnboardingScreen({ navigation }) {
   return (
     <View style={styles.container}>
@@ -45,7 +53,7 @@ export default function OnboardingScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: C.cream },
   inner: {
     flex: 1,
     paddingHorizontal: 28,
@@ -56,12 +64,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 34,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: C.night,
     lineHeight: 42,
   },
   subtitle: {
     fontSize: 15,
-    color: '#ABABAB',
+    color: C.hint,
     lineHeight: 22,
   },
   cards: { gap: 16 },
@@ -80,6 +88,6 @@ const styles = StyleSheet.create({
   },
   cardEmoji: { fontSize: 34 },
   cardTextContainer: { flex: 1 },
-  cardLabel: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 3 },
-  cardDesc: { fontSize: 13, color: '#6B6B6B' },
+  cardLabel: { fontSize: 17, fontWeight: '700', color: C.night, marginBottom: 3 },
+  cardDesc: { fontSize: 13, color: C.muted },
 });

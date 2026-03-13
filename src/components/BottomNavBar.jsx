@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   activeText: {
-    color: '#AB6453',
+    color: '#FF6B2C',
   },
   highlight: {
     position: 'absolute',
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     left: (TAB_WIDTH - 60) / 2,
     width: 60,
     height: 44,
-    backgroundColor: 'rgba(171,100,83,0.08)',
+    backgroundColor: 'rgba(255, 107, 44, 0.08)',
     borderRadius: 30,
   }
 });

@@ -6,9 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const SKILLS = ['JavaScript', 'React', 'Figma', 'Python', 'TypeScript', 'Node.js', 'SQL', 'Go', 'Swift', 'Kotlin'];
-// BUG FIX: use spread to avoid mutating the original SKILLS array
-const randomSkills = [...SKILLS].sort(() => Math.random() - 0.5).slice(0, 5);
+const ALL_SKILLS = ['JavaScript', 'React', 'Figma', 'Python', 'TypeScript', 'Node.js', 'SQL', 'Go', 'Swift', 'Kotlin'];
 
 export default function ProfileScreen({ route, navigation }) {
   const {
@@ -18,7 +16,17 @@ export default function ProfileScreen({ route, navigation }) {
     totalSwipes = 0,
     totalLikes = 0,
     matchCount = 0,
+    aboutMe = '',
+    // FIX: Read skills from route params (set by LoginScreen).
+    // Fall back to a stable random slice only if not provided — avoids re-randomising on every render.
+    skills,
   } = route.params || {};
+
+  // FIX: useMemo ensures the fallback slice is stable across re-renders
+  const displaySkills = React.useMemo(() => {
+    if (skills && skills.length > 0) return skills;
+    return [...ALL_SKILLS].sort(() => Math.random() - 0.5).slice(0, 5);
+  }, [skills]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -41,13 +49,13 @@ export default function ProfileScreen({ route, navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Profile card */}
-        <LinearGradient colors={['#AB6453', '#C4795D']} style={styles.profileCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <LinearGradient colors={['#FF6B2C', '#FF9A62']} style={styles.profileCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={styles.avatar}><Text style={styles.avatarEmoji}>🙋</Text></View>
           <Text style={styles.pName}>{userName}</Text>
           <Text style={styles.pRole}>{userRole}</Text>
-          {route.params?.aboutMe && (
-            <Text style={styles.pBio} numberOfLines={2}>{route.params.aboutMe}</Text>
-          )}
+          {aboutMe ? (
+            <Text style={styles.pBio} numberOfLines={2}>{aboutMe}</Text>
+          ) : null}
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statVal}>{totalSwipes}</Text>
@@ -70,7 +78,7 @@ export default function ProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>SKILLS</Text>
           <View style={styles.chips}>
-            {randomSkills.map((s) => (
+            {displaySkills.map((s) => (
               <View key={s} style={styles.chip}>
                 <Text style={styles.chipText}>{s}</Text>
               </View>
@@ -85,7 +93,7 @@ export default function ProfileScreen({ route, navigation }) {
             { label: 'Looking for', val: jobType },
             { label: 'Availability', val: 'Immediate' },
             { label: 'Remote OK?', val: 'Yes 🌍' },
-            { label: 'Salary (min)', val: '£40,000' },
+            { label: 'Salary (min)', val: '₦250,000' },
           ].map(({ label, val }) => (
             <View key={label} style={styles.prefRow}>
               <Text style={styles.prefLabel}>{label}</Text>
@@ -104,11 +112,11 @@ export default function ProfileScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: '#FFF5EE' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: '#1A1A1A' },
+  title: { fontSize: 28, fontWeight: '800', color: '#1A1A2E' },
   editBtn: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
-  editIcon: { fontSize: 18, color: '#1A1A1A' },
+  editIcon: { fontSize: 18, color: '#1A1A2E' },
   scroll: { paddingHorizontal: 24, paddingBottom: 24, gap: 14 },
 
   profileCard: { borderRadius: 24, padding: 28, alignItems: 'center', gap: 8 },
@@ -127,13 +135,13 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: '#ABABAB', marginBottom: 12 },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: 'rgba(171,100,83,0.1)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  chipText: { fontSize: 12, fontWeight: '600', color: '#AB6453' },
+  chip: { backgroundColor: 'rgba(255, 107, 44, 0.1)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  chipText: { fontSize: 12, fontWeight: '600', color: '#FF6B2C' },
 
   prefRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
   prefLabel: { fontSize: 13, color: '#6B6B6B' },
-  prefVal: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+  prefVal: { fontSize: 13, fontWeight: '600', color: '#1A1A2E' },
 
-  logoutBtn: { backgroundColor: 'rgba(255,77,103,0.1)', borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
-  logoutText: { color: '#FF4D67', fontSize: 14, fontWeight: '700' },
+  logoutBtn: { backgroundColor: 'rgba(255,71,87,0.1)', borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
+  logoutText: { color: '#FF4757', fontSize: 14, fontWeight: '700' },
 });

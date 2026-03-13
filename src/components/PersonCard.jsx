@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   matchText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#AB6453',
+    color: '#FF6B2C',
   },
   body: {
     padding: 20,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skillChip: {
-    backgroundColor: 'rgba(171,100,83,0.08)',
+    backgroundColor: 'rgba(255, 107, 44, 0.08)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -125,6 +125,6 @@ const styles = StyleSheet.create({
   skillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6C5CE7',
+    color: '#7B4FE9',
   },
 });

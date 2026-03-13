@@ -38,8 +38,9 @@ export default function SplashScreen({ navigation }) {
         <View style={styles.iconBox}>
           <Text style={styles.icon}>💼</Text>
         </View>
-        <Text style={styles.wordmark}>GYJN</Text>
-        <Text style={styles.tagline}>GET YOUR JOB NOW</Text>
+        {/* Wordmark and Tagline */}
+        <Text style={styles.wordmark}>Jinni</Text>
+        <Text style={styles.tagline}>MAKE A WISH. GET YOUR JOB.</Text>
       </Animated.View>
 
       <View style={styles.loaderTrack}>
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFF5EE',
   },
   content: {
     alignItems: 'center',
@@ -64,18 +65,18 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 28,
-    backgroundColor: 'rgba(171,100,83,0.1)',
+    backgroundColor: 'rgba(255, 107, 44, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(171,100,83,0.2)',
+    borderColor: 'rgba(255, 107, 44, 0.2)',
     marginBottom: 4,
   },
   icon: { fontSize: 48 },
   wordmark: {
     fontSize: 46,
     fontWeight: '900',
-    color: '#1A1A1A',
+    color: '#FF6B2C',
     letterSpacing: -1,
   },
   tagline: {
@@ -95,7 +96,7 @@ const styles = StyleSheet.create({
   },
   loaderBar: {
     height: '100%',
-    backgroundColor: '#AB6453',
+    backgroundColor: '#FF6B2C',
     borderRadius: 10,
   },
 });
