@@ -78,10 +78,28 @@ function JobCard({ job, onPress }) {
 // ─── AnimatedCard ───────────────────────────────────────────────────────────
 // Each card gets its own useAnimatedStyle hook for smooth deck animations.
 
-function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress, isPreload }) {
+function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress, isPreload, swipedCardId, indexOffset }) {
+  // Animate opacity so the back (preload) card fades in instead of popping
+  const opacity = useSharedValue(isPreload ? 0 : 1);
+
+  useEffect(() => {
+    opacity.value = isPreload ? 0 : withTiming(1, { duration: 180 });
+  }, [isPreload, opacity]);
+
   const animStyle = useAnimatedStyle(() => {
-    if (isTop) {
+    // If this card just completed swiping out, hide it instantly before React removes it
+    if (swipedCardId && swipedCardId.value === job.id) {
+      return { opacity: 0, transform: [] };
+    }
+
+    // Determine the true visual index mapping during the hand-off frame
+    const offset = indexOffset ? indexOffset.value : 0;
+    const currentIndex = Math.max(0, stackIndex - offset);
+    const activeIsTop = currentIndex === 0;
+
+    if (activeIsTop) {
       return {
+        opacity: opacity.value,
         transform: [
           { translateX: translateX.value },
           { translateY: translateY.value },
@@ -92,13 +110,14 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
     // Background card rises + scales as user drags the top card
     const dist = Math.sqrt(translateX.value ** 2 + translateY.value ** 2);
     const progress = Math.min(1, dist / SWIPE_THRESHOLD);
-    
+
     // Scale: 1.0 (top) down to ~0.84 (5th card)
-    const baseScale = 1 - stackIndex * 0.04;
+    const baseScale = 1 - currentIndex * 0.04;
     // translateY: 0 (top) down and back to 120 (5th card)
-    const baseTranslateY = stackIndex * RISE_DISTANCE;
+    const baseTranslateY = currentIndex * RISE_DISTANCE;
 
     return {
+      opacity: opacity.value,
       transform: [
         { scale: interpolate(progress, [0, 1], [baseScale, baseScale + 0.04]) },
         { translateY: interpolate(progress, [0, 1], [baseTranslateY, baseTranslateY - RISE_DISTANCE]) },
@@ -108,7 +127,7 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
 
   return (
     <Animated.View
-      style={[styles.cardWrapper, animStyle, { zIndex: 100 - stackIndex, opacity: isPreload ? 0 : 1 }]}
+      style={[styles.cardWrapper, animStyle, { zIndex: 100 - stackIndex }]}
       renderToHardwareTextureAndroid={true}
       shouldRasterizeIOS={true}
     >
@@ -164,7 +183,17 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const swipedCardId = useSharedValue(null);
+  const indexOffset = useSharedValue(0);
+
   const { userName } = route.params || { userName: 'Professional' };
+
+  // Sync indexOffset back to 0 when React finishes updating the jobs array.
+  const topJobId = jobs[0]?.id;
+  useEffect(() => {
+    swipedCardId.value = null;
+    indexOffset.value = 0;
+  }, [topJobId, swipedCardId, indexOffset]);
 
   // Called after a successful swipe animation completes
   const handleSwipeComplete = useCallback((direction) => {
@@ -185,6 +214,13 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       startY: currentY
     }]);
 
+    // Instantly freeze the visual state on the UI thread
+    // This perfectly bridges the gap before React re-renders the deck
+    swipedCardId.value = topJob.id;
+    indexOffset.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+
     setJobs(prev => {
       // Filter out the top job (slice is safer here)
       const remaining = prev.slice(1);
@@ -199,10 +235,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       }
       return remaining;
     });
-
-    // Reset shared values for the NEW top card immediately
-    translateX.value = 0;
-    translateY.value = 0;
 
     if (direction === 'right') {
       if (onMatchLand) onMatchLand(topJob);
@@ -295,6 +327,8 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           translateY={translateY}
           onPress={openDetail}
           isPreload={isPreload}
+          swipedCardId={swipedCardId}
+          indexOffset={indexOffset}
         />
       );
 
