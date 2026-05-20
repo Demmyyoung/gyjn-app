@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import SwipeScreen from './SwipeScreen';
+import EmployerScreen from './EmployerScreen';
 import MatchesScreen from './MatchesScreen';
 import ProfileScreen from './ProfileScreen';
 import BottomNavBar from '../components/BottomNavBar';
@@ -11,9 +12,7 @@ export default function MainPager({ route, navigation }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollViewRef = useRef(null);
 
-  // BUG FIX: Track matches in state so SwipeScreen can add them
-  // and MatchesScreen can display them.
-  const [matches, setMatches] = useState([]);
+  const isEmployer = route.params?.userType === 'employer';
 
   const handleTabPress = (index) => {
     scrollViewRef.current?.scrollTo({ x: index * width, animated: true });
@@ -26,12 +25,6 @@ export default function MainPager({ route, navigation }) {
     if (index !== activeIndex) {
       setActiveIndex(index);
     }
-  };
-
-  // Called by SwipeScreen when user swipes right on a job
-  const handleMatchLand = (job) => {
-    if (!job) return;
-    setMatches(prev => [...prev, job]);
   };
 
   const commonParams = { ...route.params };
@@ -49,23 +42,29 @@ export default function MainPager({ route, navigation }) {
         scrollEnabled={false}
       >
         <View style={{ width }}>
-          <SwipeScreen
-            route={{ params: commonParams }}
-            navigation={navigation}
-            onMatchLand={handleMatchLand}
-            isNested
-          />
+          {isEmployer ? (
+            <EmployerScreen
+              route={{ params: commonParams }}
+              navigation={navigation}
+            />
+          ) : (
+            <SwipeScreen
+              route={{ params: commonParams }}
+              navigation={navigation}
+              isNested
+            />
+          )}
         </View>
         <View style={{ width }}>
           <MatchesScreen
-            route={{ params: { ...commonParams, matches } }}
+            route={{ params: commonParams }}
             navigation={navigation}
             isNested
           />
         </View>
         <View style={{ width }}>
           <ProfileScreen
-            route={{ params: { ...commonParams, matchCount: matches.length } }}
+            route={{ params: commonParams }}
             navigation={navigation}
             isNested
           />

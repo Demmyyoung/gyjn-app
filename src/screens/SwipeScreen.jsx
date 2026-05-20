@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { JOBS } from '../data/jobs';
+import { supabase } from '../lib/supabase';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CARD_W = SCREEN_W - 48;
@@ -78,14 +78,7 @@ function JobCard({ job, onPress }) {
 // ─── AnimatedCard ───────────────────────────────────────────────────────────
 // Each card gets its own useAnimatedStyle hook for smooth deck animations.
 
-function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress, isPreload, swipedCardId, indexOffset }) {
-  // Animate opacity so the back (preload) card fades in instead of popping
-  const opacity = useSharedValue(isPreload ? 0 : 1);
-
-  useEffect(() => {
-    opacity.value = isPreload ? 0 : withTiming(1, { duration: 180 });
-  }, [isPreload, opacity]);
-
+function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress, swipedCardId, indexOffset }) {
   const animStyle = useAnimatedStyle(() => {
     // If this card just completed swiping out, hide it instantly before React removes it
     if (swipedCardId && swipedCardId.value === job.id) {
@@ -99,7 +92,7 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
 
     if (activeIsTop) {
       return {
-        opacity: opacity.value,
+        opacity: 1,
         transform: [
           { translateX: translateX.value },
           { translateY: translateY.value },
@@ -116,8 +109,13 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
     // translateY: 0 (top) down and back to 120 (5th card)
     const baseTranslateY = currentIndex * RISE_DISTANCE;
 
+    // Fade the back card in dynamically during the swipe gesture
+    const baseOpacity = currentIndex >= 5 ? 0 : 1;
+    const nextOpacity = currentIndex - 1 >= 5 ? 0 : 1;
+    const currentOpacity = interpolate(progress, [0, 1], [baseOpacity, nextOpacity]);
+
     return {
-      opacity: opacity.value,
+      opacity: currentOpacity,
       transform: [
         { scale: interpolate(progress, [0, 1], [baseScale, baseScale + 0.04]) },
         { translateY: interpolate(progress, [0, 1], [baseTranslateY, baseTranslateY - RISE_DISTANCE]) },
@@ -176,10 +174,46 @@ function LeavingCard({ item, onComplete }) {
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
-  const [jobs, setJobs] = useState(JOBS);
+  const [jobs, setJobs] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [detailJob, setDetailJob] = useState(null);
   const [exitingCards, setExitingCards] = useState([]);
+
+  const fetchJobs = async (append = false) => {
+    const { data } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      if (append) {
+        // Tag refill IDs so they don't key-clash with existing cards
+        const refill = data.map(j => ({
+          ...j,
+          id: `${j.id}-refill-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+        }));
+        setJobs(prev => [...prev, ...refill]);
+      } else {
+        setJobs(data);
+      }
+    }
+  };
+
+  // Save a match record to Supabase when user swipes right
+  const saveMatch = async (job) => {
+    const { error } = await supabase.from('matches').insert({
+      job_id:         job.id,
+      candidate_name: userName,
+      candidate_role: route.params?.userRole ?? '',
+      match_percent:  job.match ?? 0,
+      status:         'Applied',
+    });
+    if (error) console.warn('[saveMatch]', error.message);
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -222,21 +256,17 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     translateY.value = 0;
 
     setJobs(prev => {
-      // Filter out the top job (slice is safer here)
       const remaining = prev.slice(1);
-      
-      // FIX: Maintain a "deep" buffer of 15 items to ensure 5 are always drawable
-      if (remaining.length < 10) {
-        const refill = JOBS.map(j => ({ 
-          ...j, 
-          id: `${j.id}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` 
-        }));
-        return [...remaining, ...refill];
+      // Refetch from Supabase when deck gets low
+      if (remaining.length < 5) {
+        fetchJobs(true);
       }
       return remaining;
     });
 
     if (direction === 'right') {
+      // Persist match to Supabase
+      saveMatch(topJob);
       if (onMatchLand) onMatchLand(topJob);
     }
   }, [jobs, onMatchLand, translateX, translateY]);
@@ -315,8 +345,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     return jobs.slice(0, renderCount).reverse().map((job, idx) => {
       const stackIndex = renderCount - 1 - idx;
       const isTop = stackIndex === 0;
-      const isPreload = stackIndex >= VISIBLE_COUNT;
-
       const card = (
         <AnimatedCard
           key={job.id}
@@ -326,7 +354,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           translateX={translateX}
           translateY={translateY}
           onPress={openDetail}
-          isPreload={isPreload}
           swipedCardId={swipedCardId}
           indexOffset={indexOffset}
         />
@@ -358,7 +385,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             <Text style={styles.emptyIcon}>🧞‍♂️</Text>
             <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
             <Text style={styles.emptySubtitle}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
-            <TouchableOpacity style={styles.reloadBtn} onPress={() => setJobs([...JOBS])}>
+            <TouchableOpacity style={styles.reloadBtn} onPress={fetchJobs}>
               <Text style={styles.reloadBtnText}>Refresh Wishes ↺</Text>
             </TouchableOpacity>
           </View>
@@ -383,7 +410,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             <Text style={styles.sheetSectionLabel}>SALARY</Text>
             <Text style={styles.sheetSalary}>{detailJob?.salary} / mo</Text>
             <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
-            <Text style={styles.sheetDesc}>{detailJob?.desc}</Text>
+            <Text style={styles.sheetDesc}>{detailJob?.description}</Text>
             <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
             {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
             <TouchableOpacity style={styles.sheetApply} onPress={() => { setShowDetail(false); triggerSwipe('right'); }}>
