@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Jinni",
-    "slug": "jinni-app",
+    "slug": "jinni",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,6 +24,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "edcb6b96-10f7-4769-a610-160094ad588f"
+      }
+    },
+    "owner": "kodx-dev"
   }
 }
