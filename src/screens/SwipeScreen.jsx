@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal, Pressable, Dimensions,
@@ -178,46 +179,54 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const [showDetail, setShowDetail] = useState(false);
   const [detailJob, setDetailJob] = useState(null);
   const [exitingCards, setExitingCards] = useState([]);
+  const queueInitialized = useRef(false);
 
-  const fetchJobs = async (append = false) => {
+  // ── Initial job fetch (cached by React Query) ──────────────────────────────
+  // staleTime=5min: switching tabs and back won't trigger a redundant network call.
+  const { data: serverJobs = [], refetch } = useQuery({
+    queryKey: ['jobs'],
+    queryFn:  async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Seed the swipe queue from query cache exactly once on first load
+  useEffect(() => {
+    if (serverJobs.length > 0 && !queueInitialized.current) {
+      queueInitialized.current = true;
+      setJobs(serverJobs);
+    }
+  }, [serverJobs]);
+
+  const handleReload = async () => {
+    const { data } = await refetch();
+    if (data) {
+      setJobs(data);
+    }
+  };
+
+  // ── Refill fetch (direct, bypasses React Query) ────────────────────────────
+  // Tags each card with a unique ID so it doesn't key-clash with existing cards.
+  const refillJobs = async () => {
     const { data } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (data && data.length > 0) {
-      if (append) {
-        // Tag refill IDs so they don't key-clash with existing cards
-        const refill = data.map(j => ({
-          ...j,
-          id: `${j.id}-refill-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
-        }));
-        setJobs(prev => [...prev, ...refill]);
-      } else {
-        setJobs(data);
-      }
+      const refill = data.map(j => ({
+        ...j,
+        id: `${j.id}-refill-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
+      }));
+      setJobs(prev => [...prev, ...refill]);
     }
   };
-
-  // Save a match record to Supabase when user swipes right
-  const saveMatch = async (job) => {
-    const { error } = await supabase.from('matches').insert({
-      job_id:              job.id,
-      candidate_name:      userName,
-      candidate_role:      route.params?.userRole ?? '',
-      about_me:            route.params?.aboutMe   ?? null,
-      job_type_preference: route.params?.jobType   ?? null,
-      skills:              route.params?.skills     ?? [],
-      cv_url:              route.params?.cvUrl      ?? null,
-      match_percent:       job.match ?? 0,
-      status:              'Applied',
-    });
-    if (error) console.warn('[saveMatch]', error.message);
-  };
-
-  useEffect(() => {
-    fetchJobs();
-  }, []);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -261,19 +270,31 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
     setJobs(prev => {
       const remaining = prev.slice(1);
-      // Refetch from Supabase when deck gets low
+      // Refill the deck when it gets low
       if (remaining.length < 5) {
-        fetchJobs(true);
+        refillJobs();
       }
       return remaining;
     });
 
     if (direction === 'right') {
       // Persist match to Supabase
-      saveMatch(topJob);
+      supabase.from('matches').insert({
+        job_id:              topJob.id,
+        candidate_name:      route.params?.userName  ?? 'Professional',
+        candidate_role:      route.params?.userRole  ?? '',
+        about_me:            route.params?.aboutMe   ?? null,
+        job_type_preference: route.params?.jobType   ?? null,
+        skills:              route.params?.skills    ?? [],
+        cv_url:              route.params?.cvUrl     ?? null,
+        match_percent:       topJob.match ?? 0,
+        status:              'Applied',
+      }).then(({ error }) => {
+        if (error) console.warn('[saveMatch]', error.message);
+      });
       if (onMatchLand) onMatchLand(topJob);
     }
-  }, [jobs, onMatchLand, translateX, translateY]);
+  }, [jobs, route.params, onMatchLand, translateX, translateY]);
 
   const hasTriggeredHaptic = useSharedValue(false);
 
@@ -389,7 +410,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             <Text style={styles.emptyIcon}>🧞‍♂️</Text>
             <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
             <Text style={styles.emptySubtitle}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
-            <TouchableOpacity style={styles.reloadBtn} onPress={fetchJobs}>
+            <TouchableOpacity style={styles.reloadBtn} onPress={handleReload}>
               <Text style={styles.reloadBtnText}>Refresh Wishes ↺</Text>
             </TouchableOpacity>
           </View>

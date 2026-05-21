@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, RefreshControl,
@@ -63,31 +64,19 @@ function MatchCard({ item, isNew }) {
 export default function MatchesScreen({ route }) {
   const { userName } = route.params || {};
   const insets = useSafeAreaInsets();
-  const [matches, setMatches] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchMatches = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    try {
+  const { data: matches = [], isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['matches', userName],
+    queryFn:  async () => {
       const { data, error } = await supabase
         .from('matches')
-        // Include job details via the FK relation
         .select('*, jobs(role, company, emoji, job_type, salary)')
         .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setMatches(data ?? []);
-    } catch (err) {
-      console.warn('[MatchesScreen] fetchMatches:', err?.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchMatches(); }, [fetchMatches]);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+    staleTime: 30_000, // 30 s — cached between tab switches
+  });
 
   const renderItem = useCallback(({ item, index }) => (
     <MatchCard item={item} isNew={index === 0} />
@@ -106,7 +95,7 @@ export default function MatchesScreen({ route }) {
         </Text>
       </View>
 
-      {loading ? (
+      {isLoading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={C.orange} size="large" />
         </View>
@@ -124,8 +113,8 @@ export default function MatchesScreen({ route }) {
           windowSize={7}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchMatches(true)}
+              refreshing={isFetching && !isLoading}
+              onRefresh={refetch}
               tintColor={C.orange}
             />
           }
