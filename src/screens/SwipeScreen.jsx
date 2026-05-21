@@ -202,11 +202,15 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   // Save a match record to Supabase when user swipes right
   const saveMatch = async (job) => {
     const { error } = await supabase.from('matches').insert({
-      job_id:         job.id,
-      candidate_name: userName,
-      candidate_role: route.params?.userRole ?? '',
-      match_percent:  job.match ?? 0,
-      status:         'Applied',
+      job_id:              job.id,
+      candidate_name:      userName,
+      candidate_role:      route.params?.userRole ?? '',
+      about_me:            route.params?.aboutMe   ?? null,
+      job_type_preference: route.params?.jobType   ?? null,
+      skills:              route.params?.skills     ?? [],
+      cv_url:              route.params?.cvUrl      ?? null,
+      match_percent:       job.match ?? 0,
+      status:              'Applied',
     });
     if (error) console.warn('[saveMatch]', error.message);
   };
