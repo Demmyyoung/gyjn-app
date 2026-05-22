@@ -475,16 +475,30 @@ const styles = StyleSheet.create({
 
   // Sections
   section: { backgroundColor: '#fff', borderRadius: 20, padding: 18, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.06)' },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: '#ABABAB', marginBottom: 12 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, color: C.orange, marginBottom: 12 },
   emptyHint: { fontSize: 13, color: C.hint, fontStyle: 'italic' },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: 'rgba(255,107,44,0.1)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  chip: { 
+    backgroundColor: 'rgba(255,107,44,0.08)', 
+    borderRadius: 20, 
+    paddingHorizontal: 14, 
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,44,0.15)',
+  },
   chipText: { fontSize: 12, fontWeight: '600', color: C.orange },
 
-  prefRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  prefLabel: { fontSize: 13, color: '#6B6B6B' },
-  prefVal: { fontSize: 13, fontWeight: '600', color: C.night },
+  prefRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingVertical: 12, 
+    borderBottomWidth: 1, 
+    borderBottomColor: 'rgba(0,0,0,0.04)' 
+  },
+  prefLabel: { fontSize: 13, fontWeight: '500', color: C.muted },
+  prefVal: { fontSize: 13, fontWeight: '700', color: C.night },
 
   logoutBtn: { backgroundColor: 'rgba(255,71,87,0.1)', borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
   logoutText: { color: '#FF4757', fontSize: 14, fontWeight: '700' },
@@ -503,9 +517,11 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#6B6B6B', letterSpacing: 0.8 },
   fieldInput: {
     backgroundColor: '#fff', borderRadius: 16,
-    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.08)',
+    borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.05)',
     paddingHorizontal: 18, paddingVertical: 14,
     fontSize: 15, color: '#1A1A1A',
+    shadowColor: C.night, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02, shadowRadius: 4, elevation: 1,
   },
   textArea: { height: 110, textAlignVertical: 'top', paddingTop: 14 },
 

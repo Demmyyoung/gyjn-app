@@ -10,6 +10,7 @@ import Animated, {
   interpolate, runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 
@@ -55,22 +56,43 @@ function Tag({ label, type }) {
 // ─── JobCard (pure renderer) ────────────────────────────────────────────────
 
 function JobCard({ job, onPress }) {
+  const colors = job.colors && job.colors.length >= 2 ? job.colors : [C.orange, C.mango];
+
   return (
-    <TouchableOpacity activeOpacity={1} onPress={onPress} style={styles.card}>
-      <View style={[styles.cardTop, { backgroundColor: job.colors[0] }]}>
+    <TouchableOpacity activeOpacity={0.95} onPress={onPress} style={styles.card}>
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.cardTop}
+      >
         <View style={styles.matchPill}>
           <Text style={styles.matchPillText}>{job.match}% match</Text>
         </View>
         <View style={styles.cardLogoWrap}>
-          <View style={[styles.cardLogoBox, { backgroundColor: 'rgba(0,0,0,0.18)' }]}>
+          <View style={styles.cardLogoBox}>
             <Text style={styles.cardLogoEmoji}>{job.emoji}</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
       <View style={styles.cardBottom}>
         <Text style={styles.cardCompany}>{job.company}</Text>
         <Text style={styles.cardRole}>{job.role}</Text>
-        <Text style={styles.cardSalary}>{job.salary} / mo</Text>
+
+        <View style={styles.cardTagsRow}>
+          {job.tags && job.tags.slice(0, 2).map((t, idx) => (
+            <View key={idx} style={[styles.cardTag, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg }]}>
+              <Text style={[styles.cardTagText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>
+                {t.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.cardBottomFooter}>
+          <Text style={styles.cardSalary}>{job.salary} / mo</Text>
+          <Text style={styles.tapPrompt}>Tap details ➔</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -124,6 +146,21 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
     };
   });
 
+  const likeStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(translateX.value, [0, 80], [0, 1], 'clamp');
+    return { opacity };
+  });
+
+  const nopeStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(translateX.value, [-80, 0], [1, 0], 'clamp');
+    return { opacity };
+  });
+
+  const saveStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(translateY.value, [0, 80], [0, 1], 'clamp');
+    return { opacity };
+  });
+
   return (
     <Animated.View
       style={[styles.cardWrapper, animStyle, { zIndex: 100 - stackIndex }]}
@@ -131,6 +168,19 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
       shouldRasterizeIOS={true}
     >
       <JobCard job={job} onPress={isTop ? onPress : undefined} />
+      {isTop && (
+        <>
+          <Animated.View style={[styles.stampOverlay, styles.stampLike, likeStyle]}>
+            <Text style={styles.stampTextLike}>APPLY</Text>
+          </Animated.View>
+          <Animated.View style={[styles.stampOverlay, styles.stampNope, nopeStyle]}>
+            <Text style={styles.stampTextNope}>SKIP</Text>
+          </Animated.View>
+          <Animated.View style={[styles.stampOverlay, styles.stampSave, saveStyle]}>
+            <Text style={styles.stampTextSave}>SAVE</Text>
+          </Animated.View>
+        </>
+      )}
     </Animated.View>
   );
 }
@@ -397,9 +447,11 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       {/* Header — logo center, filter right */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={{ width: 40 }} />
-        <Text style={styles.logo}>Jinni</Text>
-        <TouchableOpacity style={styles.filterBtn}>
-          <Text style={styles.filterIcon}>☰</Text>
+        <Text style={styles.logo}>🧞‍♂️ Jinni</Text>
+        <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
+          <View style={styles.filterBtnCircle}>
+            <Text style={styles.filterIcon}>☰</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -438,8 +490,19 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             <Text style={styles.sheetDesc}>{detailJob?.description}</Text>
             <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
             {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
-            <TouchableOpacity style={styles.sheetApply} onPress={() => { setShowDetail(false); triggerSwipe('right'); }}>
-              <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={{ marginTop: 24 }}
+              onPress={() => { setShowDetail(false); triggerSwipe('right'); }}
+            >
+              <LinearGradient
+                colors={[C.orange, C.mango]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sheetApply}
+              >
+                <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -460,7 +523,13 @@ const styles = StyleSheet.create({
   },
   logo: { fontSize: 22, fontWeight: '900', color: C.orange, letterSpacing: -0.5 },
   filterBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  filterIcon: { fontSize: 18, color: C.night },
+  filterBtnCircle: {
+    width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
+  },
+  filterIcon: { fontSize: 16, color: C.night },
 
   // Deck
   deck: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -475,17 +544,141 @@ const styles = StyleSheet.create({
   },
   cardTop: { flex: 1, justifyContent: 'space-between', padding: 20 },
   matchPill: {
-    alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  matchPillText: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  matchPillText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   cardLogoWrap: { alignSelf: 'flex-start' },
-  cardLogoBox: { width: 56, height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  cardLogoEmoji: { fontSize: 28 },
-  cardBottom: { backgroundColor: C.night, paddingHorizontal: 24, paddingVertical: 22, gap: 4 },
-  cardCompany: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 1.2, textTransform: 'uppercase' },
-  cardRole: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  cardSalary: { fontSize: 14, fontWeight: '600', color: C.gold, marginTop: 2 },
+  cardLogoBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  cardLogoEmoji: { fontSize: 32 },
+  cardBottom: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    gap: 8,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  cardCompany: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.orange,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  cardRole: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.night,
+    letterSpacing: -0.5,
+  },
+  cardTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  cardTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  cardTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  cardBottomFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.04)',
+    paddingTop: 10,
+  },
+  cardSalary: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.night,
+  },
+  tapPrompt: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: C.hint,
+  },
+
+  // Stamp Overlays
+  stampOverlay: {
+    position: 'absolute',
+    top: 36,
+    borderWidth: 4,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 150,
+  },
+  stampLike: {
+    left: 36,
+    borderColor: C.green,
+    transform: [{ rotate: '-12deg' }],
+  },
+  stampNope: {
+    right: 36,
+    borderColor: C.red,
+    transform: [{ rotate: '12deg' }],
+  },
+  stampSave: {
+    alignSelf: 'center',
+    top: CARD_HEIGHT / 2 - 30,
+    borderColor: C.gold,
+    transform: [{ rotate: '-5deg' }],
+  },
+  stampTextLike: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: C.green,
+    letterSpacing: 2,
+  },
+  stampTextNope: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: C.red,
+    letterSpacing: 2,
+  },
+  stampTextSave: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: C.gold,
+    letterSpacing: 2,
+  },
 
   // Empty state
   emptyDeck: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40 },
@@ -505,7 +698,7 @@ const styles = StyleSheet.create({
   sheetSalary: { fontSize: 20, fontWeight: '800', color: C.night },
   sheetDesc: { fontSize: 14, color: C.muted, lineHeight: 22 },
   sheetReq: { fontSize: 14, color: C.muted, marginBottom: 4, lineHeight: 22 },
-  sheetApply: { backgroundColor: C.orange, paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 24 },
+  sheetApply: { paddingVertical: 16, borderRadius: 16, alignItems: 'center', width: '100%' },
   sheetApplyText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   tag: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },

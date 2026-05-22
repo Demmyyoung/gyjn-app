@@ -25,26 +25,36 @@ export default function OnboardingScreen({ navigation }) {
         <View style={styles.cards}>
           <TouchableOpacity
             style={styles.card}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => navigation.navigate('Login', { role: 'seeker' })}
           >
-            <Text style={styles.cardEmoji}>🙋</Text>
-            <View style={styles.cardTextContainer}>
-              <Text style={styles.cardLabel}>Job Seeker</Text>
-              <Text style={styles.cardDesc}>Swipe on jobs, get matched, land interviews</Text>
+            <View style={styles.cardLeft}>
+              <View style={[styles.emojiBox, { backgroundColor: 'rgba(255, 107, 44, 0.08)' }]}>
+                <Text style={styles.cardEmoji}>🙋</Text>
+              </View>
+              <View style={styles.cardTextContainer}>
+                <Text style={styles.cardLabel}>Job Seeker</Text>
+                <Text style={styles.cardDesc}>Swipe on jobs, get matched, land interviews</Text>
+              </View>
             </View>
+            <Text style={styles.cardArrow}>➔</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.card}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => navigation.navigate('Login', { role: 'employer' })}
           >
-            <Text style={styles.cardEmoji}>🏢</Text>
-            <View style={styles.cardTextContainer}>
-              <Text style={styles.cardLabel}>Employer</Text>
-              <Text style={styles.cardDesc}>Post roles, discover talent, hire fast</Text>
+            <View style={styles.cardLeft}>
+              <View style={[styles.emojiBox, { backgroundColor: 'rgba(123, 79, 233, 0.08)' }]}>
+                <Text style={styles.cardEmoji}>🏢</Text>
+              </View>
+              <View style={styles.cardTextContainer}>
+                <Text style={styles.cardLabel}>Employer</Text>
+                <Text style={styles.cardDesc}>Post roles, discover talent, hire fast</Text>
+              </View>
             </View>
+            <Text style={styles.cardArrow}>➔</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -75,19 +85,35 @@ const styles = StyleSheet.create({
   cards: { gap: 16 },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 22,
+    borderRadius: 24,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    justifyContent: 'space-between',
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.04,
     shadowRadius: 12,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.015)',
   },
-  cardEmoji: { fontSize: 34 },
-  cardTextContainer: { flex: 1 },
-  cardLabel: { fontSize: 17, fontWeight: '700', color: C.night, marginBottom: 3 },
-  cardDesc: { fontSize: 13, color: C.muted },
+  cardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
+  },
+  emojiBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardEmoji: { fontSize: 26 },
+  cardTextContainer: { flex: 1, gap: 2 },
+  cardLabel: { fontSize: 16, fontWeight: '800', color: C.night },
+  cardDesc: { fontSize: 12, color: C.muted, lineHeight: 16 },
+  cardArrow: { fontSize: 18, color: C.orange, fontWeight: '700', paddingLeft: 8 },
 });
