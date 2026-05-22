@@ -35,6 +35,12 @@
         "projectId": "edcb6b96-10f7-4769-a610-160094ad588f"
       }
     },
-    "owner": "kodx-dev"
+    "owner": "kodx-dev",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/edcb6b96-10f7-4769-a610-160094ad588f"
+    }
   }
 }
