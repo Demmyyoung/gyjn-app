@@ -1,7 +1,7 @@
 import "react-native-gesture-handler";
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { NavigationContainer, useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -15,6 +15,7 @@ import SwipeScreen     from "./src/screens/SwipeScreen";
 import MatchesScreen   from "./src/screens/MatchesScreen";
 import ProfileScreen   from "./src/screens/ProfileScreen";
 import EmployerScreen  from "./src/screens/EmployerScreen";
+import ChatScreen      from "./src/screens/ChatScreen";
 
 // ── React Query client ────────────────────────────────────────────────────────
 // Single instance for the app lifetime. Provides caching for SwipeScreen jobs
@@ -33,17 +34,8 @@ const queryClient = new QueryClient({
 const Tab = createBottomTabNavigator();
 
 // Custom tab bar icon component
-function TabIcon({ emoji, label, focused }) {
-  return (
-    <View style={{ alignItems: "center", justifyContent: "center" }}>
-      <Text style={{ fontSize: 22 }}>{emoji}</Text>
-      <Text style={{
-        fontSize: 10, fontWeight: "600",
-        color: focused ? "#FF6B2C" : "#ABABAB",
-        marginTop: 2,
-      }}>{label}</Text>
-    </View>
-  );
+function TabIcon({ emoji }) {
+  return <Text style={{ fontSize: 22 }}>{emoji}</Text>;
 }
 
 /**
@@ -61,13 +53,21 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: "#FF6B2C",
+        tabBarInactiveTintColor: "#ABABAB",
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+          marginTop: -2,
+          marginBottom: 2,
+        },
         tabBarStyle: {
-          height: 70,
           backgroundColor: "#fff",
           borderTopWidth: 1,
           borderTopColor: "rgba(0,0,0,0.06)",
-          paddingBottom: 10,
+          paddingTop: 6,
+          paddingBottom: 4,
         },
         // Freeze off-screen tabs to preserve memory (Constraint 4)
         freezeOnBlur: true,
@@ -78,9 +78,7 @@ function MainTabs() {
         component={isEmployer ? EmployerScreen : SwipeScreen}
         initialParams={params}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="💼" label="Discover" focused={focused} />
-          ),
+          tabBarIcon: () => <TabIcon emoji="💼" />,
         }}
       />
       <Tab.Screen
@@ -88,9 +86,8 @@ function MainTabs() {
         component={MatchesScreen}
         initialParams={params}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="💬" label="Matches" focused={focused} />
-          ),
+          title: isEmployer ? "Applicants" : "Applied",
+          tabBarIcon: () => <TabIcon emoji="💬" />,
         }}
       />
       <Tab.Screen
@@ -98,9 +95,7 @@ function MainTabs() {
         component={ProfileScreen}
         initialParams={params}
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="👤" label="Profile" focused={focused} />
-          ),
+          tabBarIcon: () => <TabIcon emoji="👤" />,
         }}
       />
     </Tab.Navigator>
@@ -126,6 +121,11 @@ export default function App() {
               <Stack.Screen
                 name="Main"
                 component={MainTabs}
+                options={{ animation: "slide_from_right" }}
+              />
+              <Stack.Screen
+                name="Chat"
+                component={ChatScreen}
                 options={{ animation: "slide_from_right" }}
               />
             </Stack.Navigator>

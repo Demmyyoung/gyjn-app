@@ -1,9 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Alert, Modal, TextInput,
   KeyboardAvoidingView, Platform, ActivityIndicator,
+  Dimensions, Pressable,
 } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming,
+  interpolate, runOnJS,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -47,6 +52,8 @@ function decodeBase64(base64) {
   return arrayBuffer;
 }
 
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
 const C = {
   orange: '#FF6B2C',
   night:  '#1A1A2E',
@@ -75,7 +82,9 @@ export default function ProfileScreen({ route, navigation }) {
     skills: initialSkills,
     cvUrl:  initialCvUrl  = null,
     cvName: initialCvName = null,
+    userType,
   } = route.params || {};
+  const isEmployer = userType === 'employer';
 
   const defaultSkills = useMemo(() =>
     initialSkills?.length > 0 ? initialSkills : ['JavaScript', 'React', 'Figma'],
@@ -101,14 +110,41 @@ export default function ProfileScreen({ route, navigation }) {
 
   const insets = useSafeAreaInsets();
 
+  // Edit profile bottom sheet animation values
+  const editTranslateY = useSharedValue(0);
+
+  const closeEditModal = useCallback(() => {
+    editTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
+      if (finished) {
+        runOnJS(setEditing)(false);
+      }
+    });
+  }, [editTranslateY]);
+
+  // Slide up sheet when opening the editor
+  useEffect(() => {
+    if (editing) {
+      editTranslateY.value = SCREEN_H;
+      editTranslateY.value = withTiming(0, { duration: 200 });
+    }
+  }, [editing, editTranslateY]);
+
+  const sheetBgStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(editTranslateY.value, [0, SCREEN_H * 0.5], [1, 0], 'clamp');
+    return { opacity };
+  });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: editTranslateY.value }],
+  }));
+
   const openEdit = () => {
     setDraft({ ...profile });
     setEditing(true);
   };
-
   const saveEdit = () => {
     setProfile({ ...draft });
-    setEditing(false);
+    closeEditModal();
   };
 
   const pickAndUploadCV = async () => {
@@ -191,8 +227,8 @@ export default function ProfileScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Profile card */}
-        <LinearGradient colors={['#FF6B2C', '#FF9A62']} style={styles.profileCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        {/* Profile card - midnight glow theme */}
+        <LinearGradient colors={[C.night, '#2A2A4E']} style={styles.profileCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={styles.avatar}>
             <Text style={styles.avatarInitials}>
               {profile.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
@@ -203,22 +239,23 @@ export default function ProfileScreen({ route, navigation }) {
           {profile.about ? (
             <Text style={styles.pBio} numberOfLines={2}>{profile.about}</Text>
           ) : null}
-          <View style={styles.statsRow}>
-            {[
-              { val: totalSwipes, lbl: 'Swipes' },
-              { val: totalLikes,  lbl: 'Likes' },
-              { val: matchCount,  lbl: 'Matches' },
-            ].map(({ val, lbl }, i) => (
-              <React.Fragment key={lbl}>
-                {i > 0 && <View style={styles.statDivider} />}
-                <View style={styles.stat}>
-                  <Text style={styles.statVal}>{val}</Text>
-                  <Text style={styles.statLbl}>{lbl}</Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
         </LinearGradient>
+
+        {/* Statistical Grid - Premium, independent glassmorphic cards */}
+        <View style={styles.statsCardsRow}>
+          {[
+            { val: totalSwipes, lbl: 'Swipes', icon: '⚡', color: C.orange },
+            { val: matchCount,  lbl: isEmployer ? 'Applicants' : 'Applied', icon: '🧞‍♂️', color: '#7B4FE9' },
+          ].map(({ val, lbl, icon, color }) => (
+            <View key={lbl} style={styles.statCard}>
+              <View style={[styles.statIconBox, { backgroundColor: `${color}12` }]}>
+                <Text style={{ fontSize: 16 }}>{icon}</Text>
+              </View>
+              <Text style={styles.statCardVal}>{val}</Text>
+              <Text style={styles.statCardLbl}>{lbl}</Text>
+            </View>
+          ))}
+        </View>
 
         {/* Skills */}
         <View style={styles.section}>
@@ -283,19 +320,21 @@ export default function ProfileScreen({ route, navigation }) {
       </ScrollView>
 
       {/* ── Edit Profile Modal ── */}
-      <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={editing} transparent animationType="none" statusBarTranslucent={true}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeEditModal}>
+          <Animated.View style={[styles.sheetBg, sheetBgStyle]} />
+        </Pressable>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1, backgroundColor: C.cream }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="box-none"
         >
-          <ScrollView
-            contentContainerStyle={styles.modalScroll}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+          <Animated.View style={[styles.sheet, sheetStyle]}>
+            <View style={styles.sheetHandle} />
+
             {/* Modal Header */}
-            <View style={[styles.modalHeader, { paddingTop: Math.max(insets.top + 8, 24) }]}>
-              <TouchableOpacity onPress={() => setEditing(false)}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={closeEditModal}>
                 <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Edit Profile</Text>
@@ -304,136 +343,143 @@ export default function ProfileScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Name */}
-            <View style={styles.group}>
-              <Text style={styles.fieldLabel}>FULL NAME</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={draft.name}
-                onChangeText={v => setDraft(p => ({ ...p, name: v }))}
-                placeholder="Your name"
-                placeholderTextColor={C.hint}
-              />
-            </View>
-
-            {/* Role */}
-            <View style={styles.group}>
-              <Text style={styles.fieldLabel}>CURRENT ROLE</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={draft.role}
-                onChangeText={v => setDraft(p => ({ ...p, role: v }))}
-                placeholder="e.g. UX Designer"
-                placeholderTextColor={C.hint}
-              />
-            </View>
-
-            {/* About */}
-            <View style={styles.group}>
-              <Text style={styles.fieldLabel}>ABOUT YOU</Text>
-              <TextInput
-                style={[styles.fieldInput, styles.textArea]}
-                value={draft.about}
-                onChangeText={v => setDraft(p => ({ ...p, about: v }))}
-                placeholder="Tell recruiters about yourself..."
-                placeholderTextColor={C.hint}
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-
-            {/* Job Type */}
-            <View style={styles.group}>
-              <Text style={styles.fieldLabel}>I'M LOOKING FOR</Text>
-              <View style={styles.pillRow}>
-                {JOB_TYPES.map(type => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.typePill, draft.jobType === type && styles.typePillActive]}
-                    onPress={() => setDraft(p => ({ ...p, jobType: type }))}
-                  >
-                    <Text style={[styles.typePillText, draft.jobType === type && styles.typePillActiveText]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <ScrollView
+              contentContainerStyle={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+            >
+              {/* Name */}
+              <View style={styles.group}>
+                <Text style={styles.fieldLabel}>FULL NAME</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={draft.name}
+                  onChangeText={v => setDraft(p => ({ ...p, name: v }))}
+                  placeholder="Your name"
+                  placeholderTextColor={C.hint}
+                />
               </View>
-            </View>
 
-            {/* Skills */}
-            <View style={styles.group}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={styles.fieldLabel}>MY SKILLS</Text>
-                <Text style={[styles.fieldLabel, { color: C.orange }]}>
-                  {draft.skills.length} selected
-                </Text>
+              {/* Role */}
+              <View style={styles.group}>
+                <Text style={styles.fieldLabel}>CURRENT ROLE</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={draft.role}
+                  onChangeText={v => setDraft(p => ({ ...p, role: v }))}
+                  placeholder="e.g. UX Designer"
+                  placeholderTextColor={C.hint}
+                />
               </View>
-              <View style={styles.pillRow}>
-                {ALL_SKILLS.map(skill => {
-                  const selected = draft.skills.includes(skill);
-                  return (
+
+              {/* About */}
+              <View style={styles.group}>
+                <Text style={styles.fieldLabel}>ABOUT YOU</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.textArea]}
+                  value={draft.about}
+                  onChangeText={v => setDraft(p => ({ ...p, about: v }))}
+                  placeholder="Tell recruiters about yourself..."
+                  placeholderTextColor={C.hint}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Job Type */}
+              <View style={styles.group}>
+                <Text style={styles.fieldLabel}>I'M LOOKING FOR</Text>
+                <View style={styles.pillRow}>
+                  {JOB_TYPES.map(type => (
                     <TouchableOpacity
-                      key={skill}
-                      style={[styles.skillPill, selected && styles.skillPillActive]}
-                      onPress={() => toggleDraftSkill(skill)}
+                      key={type}
+                      style={[styles.typePill, draft.jobType === type && styles.typePillActive]}
+                      onPress={() => setDraft(p => ({ ...p, jobType: type }))}
                     >
-                      {selected && <Text style={styles.skillCheck}>✓ </Text>}
-                      <Text style={[styles.skillPillText, selected && styles.skillPillActiveText]}>
-                        {skill}
+                      <Text style={[styles.typePillText, draft.jobType === type && styles.typePillActiveText]}>
+                        {type}
                       </Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* CV section */}
-            <View style={styles.group}>
-              <Text style={styles.fieldLabel}>CV / RESUME</Text>
-              {cvUrl ? (
-                <View style={styles.cvEditRow}>
-                  <Text style={styles.cvIcon}>📄</Text>
-                  <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'Uploaded CV'}</Text>
-                  <TouchableOpacity onPress={pickAndUploadCV} style={styles.cvReplaceBtn} disabled={cvUploading}>
-                    {cvUploading
-                      ? <ActivityIndicator color={C.orange} size="small" />
-                      : <Text style={styles.cvReplaceText}>Replace</Text>
-                    }
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtnEdit}>
-                    <Text style={styles.cvDeleteText}>✕</Text>
-                  </TouchableOpacity>
+                  ))}
                 </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.cvPickBox}
-                  onPress={pickAndUploadCV}
-                  disabled={cvUploading}
-                  activeOpacity={0.8}
-                >
-                  {cvUploading ? (
-                    <ActivityIndicator color={C.orange} size="small" />
-                  ) : (
-                    <>
-                      <Text style={styles.cvPickIcon}>📄</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.cvPickText}>Upload your CV</Text>
-                        <Text style={styles.cvPickSub}>PDF or Word</Text>
-                      </View>
-                      <Text style={styles.cvPickArrow}>↑</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
+              </View>
 
-            {/* Save button at bottom */}
-            <TouchableOpacity onPress={saveEdit} activeOpacity={0.85} style={{ marginTop: 8 }}>
-              <LinearGradient colors={['#FF6B2C', '#FF9A62']} style={styles.saveCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.saveCtaText}>Save Changes</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </ScrollView>
+              {/* Skills */}
+              <View style={styles.group}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={styles.fieldLabel}>MY SKILLS</Text>
+                  <Text style={[styles.fieldLabel, { color: C.orange }]}>
+                    {draft.skills.length} selected
+                  </Text>
+                </View>
+                <View style={styles.pillRow}>
+                  {ALL_SKILLS.map(skill => {
+                    const selected = draft.skills.includes(skill);
+                    return (
+                      <TouchableOpacity
+                        key={skill}
+                        style={[styles.skillPill, selected && styles.skillPillActive]}
+                        onPress={() => toggleDraftSkill(skill)}
+                      >
+                        {selected && <Text style={styles.skillCheck}>✓ </Text>}
+                        <Text style={[styles.skillPillText, selected && styles.skillPillActiveText]}>
+                          {skill}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* CV section */}
+              <View style={styles.group}>
+                <Text style={styles.fieldLabel}>CV / RESUME</Text>
+                {cvUrl ? (
+                  <View style={styles.cvEditRow}>
+                    <Text style={styles.cvIcon}>📄</Text>
+                    <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'Uploaded CV'}</Text>
+                    <TouchableOpacity onPress={pickAndUploadCV} style={styles.cvReplaceBtn} disabled={cvUploading}>
+                      {cvUploading
+                        ? <ActivityIndicator color={C.orange} size="small" />
+                        : <Text style={styles.cvReplaceText}>Replace</Text>
+                      }
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtnEdit}>
+                      <Text style={styles.cvDeleteText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.cvPickBox}
+                    onPress={pickAndUploadCV}
+                    disabled={cvUploading}
+                    activeOpacity={0.8}
+                  >
+                    {cvUploading ? (
+                      <ActivityIndicator color={C.orange} size="small" />
+                    ) : (
+                      <>
+                        <Text style={styles.cvPickIcon}>📄</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cvPickText}>Upload your CV</Text>
+                          <Text style={styles.cvPickSub}>PDF or Word</Text>
+                        </View>
+                        <Text style={styles.cvPickArrow}>↑</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Save button at bottom */}
+              <TouchableOpacity onPress={saveEdit} activeOpacity={0.85} style={{ marginTop: 8 }}>
+                <LinearGradient colors={['#FF6B2C', '#FF9A62']} style={styles.saveCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Text style={styles.saveCtaText}>Save Changes</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -457,21 +503,74 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 14 },
 
   // Profile card
-  profileCard: { borderRadius: 24, padding: 28, alignItems: 'center', gap: 8 },
+  profileCard: {
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
   avatar: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3.5,
+    borderColor: C.orange,
   },
   avatarInitials: { fontSize: 30, fontWeight: '900', color: '#fff' },
   pName: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  pRole: { fontSize: 13, color: 'rgba(255,255,255,0.75)' },
-  pBio: { fontSize: 12, color: 'rgba(255,255,255,0.9)', textAlign: 'center', marginTop: 4, paddingHorizontal: 10 },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 },
-  stat: { alignItems: 'center' },
-  statVal: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  statLbl: { fontSize: 11, color: 'rgba(255,255,255,0.65)' },
-  statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.25)' },
+  pRole: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
+  pBio: { fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 4, paddingHorizontal: 10, lineHeight: 18 },
+
+  // Stats cards
+  statsCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 4,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.015)',
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statCardVal: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: C.night,
+  },
+  statCardLbl: {
+    fontSize: 10,
+    color: C.muted,
+    fontWeight: '700',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 
   // Sections
   section: { backgroundColor: '#fff', borderRadius: 20, padding: 18, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.06)' },
@@ -597,4 +696,40 @@ const styles = StyleSheet.create({
   cvPickText:  { fontSize: 14, fontWeight: '600', color: C.night },
   cvPickSub:   { fontSize: 11, color: C.hint, marginTop: 2 },
   cvPickArrow: { fontSize: 18, fontWeight: '700', color: C.orange },
+
+  // Bottom sheet modal container styles
+  sheetBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    maxHeight: SCREEN_H * 0.85,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 24,
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
 });

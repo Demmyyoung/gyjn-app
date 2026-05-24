@@ -2,8 +2,31 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Modal, Pressable, Dimensions,
+  ScrollView, Modal, Pressable, Dimensions, Platform, NativeModules,
 } from 'react-native';
+
+const getBackendUrl = () => {
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  // Dynamically resolve your computer's local IP address from the Metro bundler URL.
+  // This ensures physical devices on the same Wi-Fi can connect to the localhost Next.js server!
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
+    if (match && match[1]) {
+      const host = match[1];
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:3000`;
+      }
+    }
+  }
+  // Emulators/Simulators fallbacks
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000';
+  }
+  return 'http://localhost:3000';
+};
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
@@ -55,43 +78,61 @@ function Tag({ label, type }) {
 
 // ─── JobCard (pure renderer) ────────────────────────────────────────────────
 
-function JobCard({ job, onPress }) {
+function JobCard({ job, onPress, isTop }) {
   const colors = job.colors && job.colors.length >= 2 ? job.colors : [C.orange, C.mango];
 
   return (
-    <TouchableOpacity activeOpacity={0.95} onPress={onPress} style={styles.card}>
-      <LinearGradient
-        colors={colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.cardTop}
-      >
-        <View style={styles.matchPill}>
-          <Text style={styles.matchPillText}>{job.match}% match</Text>
-        </View>
-        <View style={styles.cardLogoWrap}>
-          <View style={styles.cardLogoBox}>
-            <Text style={styles.cardLogoEmoji}>{job.emoji}</Text>
+    <TouchableOpacity 
+      activeOpacity={0.95} 
+      onPress={onPress} 
+      style={[
+        styles.card,
+        !isTop && {
+          shadowOpacity: 0,
+          elevation: 0,
+        }
+      ]}
+    >
+      <View style={[
+        styles.cardInner,
+        !isTop && {
+          borderWidth: 1.5,
+          borderColor: '#F2EDE8',
+        }
+      ]}>
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cardTop}
+        >
+          <View style={styles.matchPill}>
+            <Text style={styles.matchPillText}>{job.match}% match</Text>
           </View>
-        </View>
-      </LinearGradient>
-      <View style={styles.cardBottom}>
-        <Text style={styles.cardCompany}>{job.company}</Text>
-        <Text style={styles.cardRole}>{job.role}</Text>
-
-        <View style={styles.cardTagsRow}>
-          {job.tags && job.tags.slice(0, 2).map((t, idx) => (
-            <View key={idx} style={[styles.cardTag, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg }]}>
-              <Text style={[styles.cardTagText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>
-                {t.label}
-              </Text>
+          <View style={styles.cardLogoWrap}>
+            <View style={styles.cardLogoBox}>
+              <Text style={styles.cardLogoEmoji}>{job.emoji}</Text>
             </View>
-          ))}
-        </View>
+          </View>
+        </LinearGradient>
+        <View style={styles.cardBottom}>
+          <Text style={styles.cardCompany}>{job.company}</Text>
+          <Text style={styles.cardRole}>{job.role}</Text>
 
-        <View style={styles.cardBottomFooter}>
-          <Text style={styles.cardSalary}>{job.salary} / mo</Text>
-          <Text style={styles.tapPrompt}>Tap details ➔</Text>
+          <View style={styles.cardTagsRow}>
+            {job.tags && job.tags.slice(0, 2).map((t, idx) => (
+              <View key={idx} style={[styles.cardTag, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg }]}>
+                <Text style={[styles.cardTagText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>
+                  {t.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.cardBottomFooter}>
+            <Text style={styles.cardSalary}>{job.salary} / mo</Text>
+            <Text style={styles.tapPrompt}>Tap details ➔</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -167,7 +208,7 @@ function AnimatedCard({ job, isTop, stackIndex, translateX, translateY, onPress,
       renderToHardwareTextureAndroid={true}
       shouldRasterizeIOS={true}
     >
-      <JobCard job={job} onPress={isTop ? onPress : undefined} />
+      <JobCard job={job} onPress={isTop ? onPress : undefined} isTop={isTop} />
       {isTop && (
         <>
           <Animated.View style={[styles.stampOverlay, styles.stampLike, likeStyle]}>
@@ -217,7 +258,7 @@ function LeavingCard({ item, onComplete }) {
       renderToHardwareTextureAndroid={true}
       shouldRasterizeIOS={true}
     >
-      <JobCard job={job} />
+      <JobCard job={job} isTop={true} />
     </Animated.View>
   );
 }
@@ -236,12 +277,31 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const { data: serverJobs = [], refetch } = useQuery({
     queryKey: ['jobs'],
     queryFn:  async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw new Error(error.message);
-      return data ?? [];
+      try {
+        const response = await fetch(`${getBackendUrl()}/api/match-jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: route.params?.userName,
+            role: route.params?.userRole,
+            aboutMe: route.params?.aboutMe,
+            skills: route.params?.skills,
+            cvUrl: route.params?.cvUrl,
+            jobType: route.params?.jobType,
+          }),
+        });
+        if (!response.ok) throw new Error('API failed');
+        const data = await response.json();
+        return data.jobs || [];
+      } catch (err) {
+        console.warn('AI matchmaking failed, falling back to direct Supabase query:', err.message);
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data ?? [];
+      }
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -261,27 +321,66 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     }
   };
 
-  // ── Refill fetch (direct, bypasses React Query) ────────────────────────────
-  // Tags each card with a unique ID so it doesn't key-clash with existing cards.
-  const refillJobs = async () => {
-    const { data } = await supabase
-      .from('jobs')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data && data.length > 0) {
-      const refill = data.map(j => ({
-        ...j,
-        id: `${j.id}-refill-${Date.now()}-${Math.random().toString(36).substr(2,4)}`,
-      }));
-      setJobs(prev => [...prev, ...refill]);
-    }
-  };
-
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const swipedCardId = useSharedValue(null);
   const indexOffset = useSharedValue(0);
+
+  // Bottom sheet gesture and animation values
+  const sheetTranslateY = useSharedValue(0);
+  const isScrollAtTop = useSharedValue(true);
+
+  const closeDetail = useCallback(() => {
+    sheetTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
+      if (finished) {
+        runOnJS(setShowDetail)(false);
+      }
+    });
+  }, [sheetTranslateY]);
+
+  // Automatically trigger slide-up transition when details modal opens
+  useEffect(() => {
+    if (showDetail) {
+      sheetTranslateY.value = SCREEN_H;
+      sheetTranslateY.value = withTiming(0, { duration: 200 });
+    }
+  }, [showDetail, sheetTranslateY]);
+
+  // Track the ScrollView y-offset to coordinate the swipe-down-to-dismiss gesture
+  const handleScroll = useCallback((event) => {
+    isScrollAtTop.value = event.nativeEvent.contentOffset.y <= 0;
+  }, [isScrollAtTop]);
+
+  // Pan gesture allowing users to swipe the details sheet back down to dismiss it
+  const sheetPan = Gesture.Pan()
+    .activeOffsetY([0, 15]) // Only capture downward vertical drag offsets
+    .onUpdate((e) => {
+      if (isScrollAtTop.value && e.translationY > 0) {
+        sheetTranslateY.value = e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      if (isScrollAtTop.value && (e.translationY > 150 || e.velocityY > 500)) {
+        sheetTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
+          if (finished) {
+            runOnJS(setShowDetail)(false);
+          }
+        });
+      } else {
+        sheetTranslateY.value = withTiming(0, { duration: 200 });
+      }
+    });
+
+  const sheetBgStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(sheetTranslateY.value, [0, SCREEN_H * 0.5], [1, 0], 'clamp');
+    return {
+      opacity,
+    };
+  });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
 
   const { userName } = route.params || { userName: 'Professional' };
 
@@ -320,10 +419,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
     setJobs(prev => {
       const remaining = prev.slice(1);
-      // Refill the deck when it gets low
-      if (remaining.length < 5) {
-        refillJobs();
-      }
       return remaining;
     });
 
@@ -352,7 +447,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     .minDistance(8)
     .onUpdate((e) => {
       translateX.value = e.translationX;
-      translateY.value = e.translationY * 0.4;
+      translateY.value = e.translationY * 0.65; // Dampen less (0.65 instead of 0.4) so vertical drag feels lighter
 
       const THRESHOLD = 100;
       const isOver = Math.abs(translateX.value) > THRESHOLD || translateY.value > THRESHOLD;
@@ -366,10 +461,12 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     })
     .onEnd((e) => {
       'worklet';
-      const THRESHOLD = 120;
-      const isDown  = translateY.value > THRESHOLD && translateY.value > Math.abs(translateX.value);
-      const isRight = translateX.value > THRESHOLD && !isDown;
-      const isLeft  = translateX.value < -THRESHOLD && !isDown;
+      const THRESHOLD = 90; // Lowered from 120 to make it require less physical drag distance
+      const VELOCITY_THRESHOLD = 600; // Flick velocity threshold (px/sec) to trigger swipe
+
+      const isDown  = (translateY.value > THRESHOLD || (e.velocityY > VELOCITY_THRESHOLD && translateY.value > 15)) && translateY.value > Math.abs(translateX.value);
+      const isRight = (translateX.value > THRESHOLD || (e.velocityX > VELOCITY_THRESHOLD && translateX.value > 15)) && !isDown;
+      const isLeft  = (translateX.value < -THRESHOLD || (e.velocityX < -VELOCITY_THRESHOLD && translateX.value < -15)) && !isDown;
 
       if (isRight || isLeft || isDown) {
         const dir = isDown ? 'down' : isRight ? 'right' : 'left';
@@ -383,8 +480,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           }
         });
       } else {
-        translateX.value = withSpring(0, { damping: 15, stiffness: 150 });
-        translateY.value = withSpring(0, { damping: 15, stiffness: 150 });
+        // Snappier, lighter spring physics to snap card back to center quickly when released
+        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+        translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
       }
       hasTriggeredHaptic.value = false;
     });
@@ -411,7 +509,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   }, [handleSwipeComplete]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const VISIBLE_COUNT = 5;
+  const VISIBLE_COUNT = 3;
   const renderCount = Math.min(jobs.length, VISIBLE_COUNT + 1);
   const insets = useSafeAreaInsets();
 
@@ -474,38 +572,53 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       </View>
 
       {/* Detail bottom sheet */}
-      <Modal visible={showDetail} transparent animationType="slide">
-        <Pressable style={styles.sheetBg} onPress={() => setShowDetail(false)} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sheetRole}>{detailJob?.role}</Text>
-            <Text style={styles.sheetCompany}>{detailJob?.company}</Text>
-            <View style={styles.tagsRow}>
-              {detailJob?.tags.map((t, i) => <Tag key={i} label={t.label} type={t.type} />)}
+      <Modal visible={showDetail} transparent animationType="none" statusBarTranslucent={true}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeDetail}>
+          <Animated.View style={[styles.sheetBg, sheetBgStyle]} />
+        </Pressable>
+        <GestureDetector gesture={sheetPan}>
+          <Animated.View style={[styles.sheet, sheetStyle]}>
+            <View style={styles.sheetHeaderPanArea}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeaderRow}>
+                <View style={{ flex: 1, marginRight: 16 }}>
+                  <Text style={styles.sheetRole} numberOfLines={1}>{detailJob?.role}</Text>
+                  <Text style={styles.sheetCompany}>{detailJob?.company}</Text>
+                </View>
+                <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={styles.sheetCloseBtn}>
+                  <Text style={styles.sheetClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.sheetSectionLabel}>SALARY</Text>
-            <Text style={styles.sheetSalary}>{detailJob?.salary} / mo</Text>
-            <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
-            <Text style={styles.sheetDesc}>{detailJob?.description}</Text>
-            <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
-            {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={{ marginTop: 24 }}
-              onPress={() => { setShowDetail(false); triggerSwipe('right'); }}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
             >
-              <LinearGradient
-                colors={[C.orange, C.mango]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.sheetApply}
+              <View style={styles.tagsRow}>
+                {detailJob?.tags.map((t, i) => <Tag key={i} label={t.label} type={t.type} />)}
+              </View>
+              <Text style={styles.sheetSectionLabel}>SALARY</Text>
+              <View style={styles.salaryCard}>
+                <Text style={styles.sheetSalary}>{detailJob?.salary} / mo</Text>
+              </View>
+              <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
+              <Text style={styles.sheetDesc}>{detailJob?.description}</Text>
+              <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
+              {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={{ marginTop: 24 }}
+                onPress={() => { closeDetail(); triggerSwipe('right'); }}
               >
-                <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+                <View style={styles.sheetApply}>
+                  <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
       </Modal>
     </View>
   );
@@ -537,12 +650,24 @@ const styles = StyleSheet.create({
 
   // Card — soft ambient shadow, no borders
   card: {
-    width: CARD_W, height: CARD_HEIGHT, borderRadius: 28, overflow: 'hidden',
+    width: CARD_W, height: CARD_HEIGHT, borderRadius: 28,
     backgroundColor: '#fff',
     shadowColor: C.night, shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  cardTop: { flex: 1, justifyContent: 'space-between', padding: 20 },
+  cardInner: {
+    flex: 1,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  cardTop: {
+    flex: 1,
+    justifyContent: 'space-between',
+    padding: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
   matchPill: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -569,11 +694,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.35)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
   },
   cardLogoEmoji: { fontSize: 32 },
   cardBottom: {
@@ -689,16 +809,110 @@ const styles = StyleSheet.create({
   reloadBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Detail sheet
-  sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, maxHeight: SCREEN_H * 0.7 },
-  sheetHandle: { width: 36, height: 4, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 10, alignSelf: 'center', marginBottom: 20 },
-  sheetRole: { fontSize: 22, fontWeight: '800', color: C.night, marginBottom: 4 },
-  sheetCompany: { fontSize: 14, fontWeight: '600', color: C.orange, marginBottom: 14 },
-  sheetSectionLabel: { fontSize: 11, fontWeight: '700', color: C.hint, letterSpacing: 0.8, marginTop: 18, marginBottom: 6 },
-  sheetSalary: { fontSize: 20, fontWeight: '800', color: C.night },
+  sheetBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    maxHeight: SCREEN_H * 0.85,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 24,
+  },
+  sheetHeaderPanArea: {
+    paddingTop: 12,
+    paddingBottom: 12,
+    width: '100%',
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 4,
+  },
+  sheetCloseBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetClose: {
+    fontSize: 20,
+    color: '#A0A0C0',
+    fontWeight: '500',
+  },
+  sheetRole: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: C.night,
+    letterSpacing: -0.5,
+  },
+  sheetCompany: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.orange,
+    marginTop: 2,
+  },
+  sheetSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B6B6B',
+    letterSpacing: 0.8,
+    marginTop: 22,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  salaryCard: {
+    backgroundColor: '#F7F7FA',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.03)',
+  },
+  sheetSalary: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.night,
+  },
   sheetDesc: { fontSize: 14, color: C.muted, lineHeight: 22 },
   sheetReq: { fontSize: 14, color: C.muted, marginBottom: 4, lineHeight: 22 },
-  sheetApply: { paddingVertical: 16, borderRadius: 16, alignItems: 'center', width: '100%' },
+  sheetApply: {
+    backgroundColor: C.orange,
+    paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
   sheetApplyText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   tag: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },

@@ -472,7 +472,7 @@ export default function EmployerScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFC', // Crisp cool-white background
+    backgroundColor: C.cream, // Yellowish cream background
   },
 
   // Navigation Header
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingBottom: 16,
-    backgroundColor: '#FAFAFC',
+    backgroundColor: C.cream,
   },
   headerTitle: {
     fontSize: 26,
