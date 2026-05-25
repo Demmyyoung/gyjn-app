@@ -81,6 +81,7 @@ const getBackendUrl = () => {
 };
 
 import { NativeModules } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 export default function LoginScreen({ navigation, route }) {
   const [name, setName]               = useState('');
@@ -93,6 +94,29 @@ export default function LoginScreen({ navigation, route }) {
   const [cvName, setCvName]           = useState(null);
   const [cvUploading, setCvUploading] = useState(false);
   const [aiParsing, setAiParsing]     = useState(false);
+
+  const pulseOpacity = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (aiParsing) {
+      pulseOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.4, { duration: 600 }),
+          withTiming(1, { duration: 600 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseOpacity.value = 1;
+    }
+  }, [aiParsing]);
+
+  const animatedPulseStyle = useAnimatedStyle(() => {
+    return {
+      opacity: pulseOpacity.value,
+    };
+  });
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
   const isEmployer = route.params?.role === 'employer';
@@ -163,6 +187,10 @@ export default function LoginScreen({ navigation, route }) {
         }
       } catch (parseErr) {
         console.warn('CV Auto-fill failed:', parseErr);
+        Alert.alert(
+          'Auto-fill Unavailable',
+          'Genie was unable to parse your CV automatically, but your file has been uploaded. Please fill in your profile details manually.'
+        );
       } finally {
         setAiParsing(false);
       }
@@ -222,47 +250,91 @@ export default function LoginScreen({ navigation, route }) {
             {isEmployer ? "Find elite talent\nin 10 seconds." : "Make a wish.\nGet your job."}
           </Text>
           <Text style={styles.subtitle}>
-            {isEmployer ? "No long recruitment cycles." : "Your profile in 10 seconds. No CVs."}
+            {isEmployer ? "No long recruitment cycles." : "Your profile in 10 seconds. Or upload a CV to auto-fill!"}
           </Text>
+
+          {/* Seekers Magic CV Auto-Fill Banner */}
+          {!isEmployer && (
+            <TouchableOpacity 
+              style={styles.magicBanner} 
+              onPress={pickAndUploadCV}
+              disabled={cvUploading || aiParsing}
+              activeOpacity={0.8}
+            >
+              <LinearGradient 
+                colors={['#FFF9F5', '#FFEADB']} 
+                style={StyleSheet.absoluteFillObject}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.magicBannerInner}>
+                <View style={styles.magicIconBox}>
+                  <Text style={styles.magicIcon}>✨</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.magicTitle}>Magic CV Auto-Fill</Text>
+                  <Text style={styles.magicDesc} numberOfLines={2} ellipsizeMode="tail">
+                    {aiParsing 
+                      ? "🧞‍♂️ Genie is reading your CV..." 
+                      : cvUploading 
+                      ? "Uploading file..." 
+                      : cvUrl 
+                      ? `CV Loaded: ${cvName}`
+                      : "Upload your CV to instantly populate your profile details."}
+                  </Text>
+                </View>
+                <Text style={styles.magicArrow}>➔</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Full Name */}
           <View style={styles.group}>
             <Text style={styles.label}>FULL NAME</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Jordan Lee"
-              placeholderTextColor="#ABABAB"
-              value={name}
-              onChangeText={setName}
-              autoCorrect={false}
-            />
+            <Animated.View style={aiParsing && animatedPulseStyle}>
+              <TextInput
+                style={[styles.input, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                placeholder={aiParsing ? "Genie is extracting name..." : "e.g. Jordan Lee"}
+                placeholderTextColor={aiParsing ? C.orange : "#ABABAB"}
+                value={name}
+                onChangeText={setName}
+                autoCorrect={false}
+                editable={!aiParsing}
+              />
+            </Animated.View>
           </View>
 
           {/* Role / Company */}
           <View style={styles.group}>
             <Text style={styles.label}>{isEmployer ? "COMPANY NAME" : "CURRENT ROLE"}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={isEmployer ? "e.g. Acme Inc" : "e.g. UX Designer"}
-              placeholderTextColor="#ABABAB"
-              value={role}
-              onChangeText={setRole}
-              autoCorrect={false}
-            />
+            <Animated.View style={aiParsing && animatedPulseStyle}>
+              <TextInput
+                style={[styles.input, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                placeholder={aiParsing ? "Genie is extracting role..." : (isEmployer ? "e.g. Acme Inc" : "e.g. UX Designer")}
+                placeholderTextColor={aiParsing ? C.orange : "#ABABAB"}
+                value={role}
+                onChangeText={setRole}
+                autoCorrect={false}
+                editable={!aiParsing}
+              />
+            </Animated.View>
           </View>
 
           {/* About */}
           <View style={styles.group}>
             <Text style={styles.label}>ABOUT {isEmployer ? "COMPANY" : "YOU"}</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder={isEmployer ? "Briefly describe your company..." : "Tell us a bit about yourself..."}
-              placeholderTextColor="#ABABAB"
-              value={aboutMe}
-              onChangeText={setAboutMe}
-              multiline
-              numberOfLines={3}
-            />
+            <Animated.View style={aiParsing && animatedPulseStyle}>
+              <TextInput
+                style={[styles.input, styles.textArea, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                placeholder={aiParsing ? "Genie is extracting bio..." : (isEmployer ? "Briefly describe your company..." : "Tell us a bit about yourself...")}
+                placeholderTextColor={aiParsing ? C.orange : "#ABABAB"}
+                value={aboutMe}
+                onChangeText={setAboutMe}
+                multiline
+                numberOfLines={3}
+                editable={!aiParsing}
+              />
+            </Animated.View>
           </View>
 
           {/* Job type (seekers) / Search target (employers) */}
@@ -302,10 +374,10 @@ export default function LoginScreen({ navigation, route }) {
               <View style={styles.skillsHeader}>
                 <Text style={styles.label}>MY SKILLS</Text>
                 <Text style={styles.skillsCount}>
-                  {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : 'Tap to select'}
+                  {aiParsing ? "Genie is matching skills..." : selectedSkills.length > 0 ? `${selectedSkills.length} selected` : 'Tap to select'}
                 </Text>
               </View>
-              <View style={styles.pillRow}>
+              <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
                 {ALL_SKILLS.map((skill) => {
                   const selected = selectedSkills.includes(skill);
                   return (
@@ -313,15 +385,16 @@ export default function LoginScreen({ navigation, route }) {
                       key={skill}
                       style={[styles.skillPill, selected && styles.skillPillActive]}
                       onPress={() => toggleSkill(skill)}
+                      disabled={aiParsing}
                     >
                       {selected && <Text style={styles.skillCheck}>✓ </Text>}
-                      <Text style={[styles.skillPillText, selected && styles.skillPillTextActive]}>
+                      <Text style={[styles.skillPillText, selected && styles.skillPillTextActive, aiParsing && { color: C.orange }]}>
                         {skill}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </Animated.View>
             </View>
           )}
 
@@ -496,4 +569,55 @@ const styles = StyleSheet.create({
   cvDoneText:   { fontSize: 13, fontWeight: '700', color: '#059669' },
   cvSubText:    { fontSize: 11, color: C.hint, marginTop: 2 },
   cvArrow:      { fontSize: 18, fontWeight: '700', color: C.orange },
+  magicBanner: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,107,44,0.25)',
+    marginVertical: 4,
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+    backgroundColor: '#FFEADB', // Solid premium peach fallback background
+  },
+  magicBannerInner: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  magicIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  magicIcon: {
+    fontSize: 20,
+  },
+  magicTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.night,
+  },
+  magicDesc: {
+    fontSize: 12,
+    color: C.muted,
+    lineHeight: 16,
+  },
+  magicArrow: {
+    fontSize: 16,
+    color: C.orange,
+    fontWeight: '700',
+  },
 });

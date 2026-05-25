@@ -6,7 +6,7 @@ import {
   Dimensions, Pressable,
 } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming,
+  useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence,
   interpolate, runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -125,6 +125,29 @@ export default function ProfileScreen({ route, navigation }) {
   const [cvUploading, setCvUploading] = useState(false);
   const [aiParsing, setAiParsing]     = useState(false);
 
+  const pulseOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (aiParsing) {
+      pulseOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.4, { duration: 600 }),
+          withTiming(1, { duration: 600 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseOpacity.value = 1;
+    }
+  }, [aiParsing]);
+
+  const animatedPulseStyle = useAnimatedStyle(() => {
+    return {
+      opacity: pulseOpacity.value,
+    };
+  });
+
   // Edit modal state
   const [editing, setEditing]         = useState(false);
   const [draft, setDraft]             = useState({ ...profile });
@@ -231,6 +254,10 @@ export default function ProfileScreen({ route, navigation }) {
         }
       } catch (parseErr) {
         console.warn('CV Auto-fill failed:', parseErr);
+        Alert.alert(
+          'Auto-fill Unavailable',
+          'Genie was unable to parse your CV automatically, but your file has been uploaded. Please update your profile details manually.'
+        );
       } finally {
         setAiParsing(false);
       }
@@ -406,39 +433,48 @@ export default function ProfileScreen({ route, navigation }) {
               {/* Name */}
               <View style={styles.group}>
                 <Text style={styles.fieldLabel}>FULL NAME</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={draft.name}
-                  onChangeText={v => setDraft(p => ({ ...p, name: v }))}
-                  placeholder="Your name"
-                  placeholderTextColor={C.hint}
-                />
+                <Animated.View style={aiParsing && animatedPulseStyle}>
+                  <TextInput
+                    style={[styles.fieldInput, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                    value={draft.name}
+                    onChangeText={v => setDraft(p => ({ ...p, name: v }))}
+                    placeholder={aiParsing ? "Genie is extracting name..." : "Your name"}
+                    placeholderTextColor={aiParsing ? C.orange : C.hint}
+                    editable={!aiParsing}
+                  />
+                </Animated.View>
               </View>
 
               {/* Role */}
               <View style={styles.group}>
                 <Text style={styles.fieldLabel}>CURRENT ROLE</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={draft.role}
-                  onChangeText={v => setDraft(p => ({ ...p, role: v }))}
-                  placeholder="e.g. UX Designer"
-                  placeholderTextColor={C.hint}
-                />
+                <Animated.View style={aiParsing && animatedPulseStyle}>
+                  <TextInput
+                    style={[styles.fieldInput, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                    value={draft.role}
+                    onChangeText={v => setDraft(p => ({ ...p, role: v }))}
+                    placeholder={aiParsing ? "Genie is extracting role..." : "e.g. UX Designer"}
+                    placeholderTextColor={aiParsing ? C.orange : C.hint}
+                    editable={!aiParsing}
+                  />
+                </Animated.View>
               </View>
 
               {/* About */}
               <View style={styles.group}>
                 <Text style={styles.fieldLabel}>ABOUT YOU</Text>
-                <TextInput
-                  style={[styles.fieldInput, styles.textArea]}
-                  value={draft.about}
-                  onChangeText={v => setDraft(p => ({ ...p, about: v }))}
-                  placeholder="Tell recruiters about yourself..."
-                  placeholderTextColor={C.hint}
-                  multiline
-                  numberOfLines={4}
-                />
+                <Animated.View style={aiParsing && animatedPulseStyle}>
+                  <TextInput
+                    style={[styles.fieldInput, styles.textArea, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                    value={draft.about}
+                    onChangeText={v => setDraft(p => ({ ...p, about: v }))}
+                    placeholder={aiParsing ? "Genie is extracting bio..." : "Tell recruiters about yourself..."}
+                    placeholderTextColor={aiParsing ? C.orange : C.hint}
+                    multiline
+                    numberOfLines={4}
+                    editable={!aiParsing}
+                  />
+                </Animated.View>
               </View>
 
               {/* Job Type */}
@@ -464,10 +500,10 @@ export default function ProfileScreen({ route, navigation }) {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Text style={styles.fieldLabel}>MY SKILLS</Text>
                   <Text style={[styles.fieldLabel, { color: C.orange }]}>
-                    {draft.skills.length} selected
+                    {aiParsing ? "Genie matching skills..." : `${draft.skills.length} selected`}
                   </Text>
                 </View>
-                <View style={styles.pillRow}>
+                <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
                   {ALL_SKILLS.map(skill => {
                     const selected = draft.skills.includes(skill);
                     return (
@@ -475,15 +511,16 @@ export default function ProfileScreen({ route, navigation }) {
                         key={skill}
                         style={[styles.skillPill, selected && styles.skillPillActive]}
                         onPress={() => toggleDraftSkill(skill)}
+                        disabled={aiParsing}
                       >
                         {selected && <Text style={styles.skillCheck}>✓ </Text>}
-                        <Text style={[styles.skillPillText, selected && styles.skillPillActiveText]}>
+                        <Text style={[styles.skillPillText, selected && styles.skillPillActiveText, aiParsing && { color: C.orange }]}>
                           {skill}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </View>
+                </Animated.View>
               </View>
 
               {/* CV section */}
