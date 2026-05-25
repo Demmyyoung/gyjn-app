@@ -4,7 +4,12 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform,
   ActivityIndicator, Alert, Modal, StatusBar, Keyboard,
   Animated as RNAnimated, Pressable, Dimensions,
+  LayoutAnimation, UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -71,6 +76,7 @@ export default function ChatScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
   const swipeableRefs = useRef({});
+  const isInitialLayout = useRef(true);
 
   // Core state
   const [messages, setMessages] = useState([]);
@@ -136,6 +142,7 @@ export default function ChatScreen({ route, navigation }) {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `match_id=eq.${matchId}`,
       }, (payload) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setMessages((prev) => {
           if (prev.some((msg) => msg.id === payload.new.id)) return prev;
           return [...prev, payload.new];
@@ -146,13 +153,18 @@ export default function ChatScreen({ route, navigation }) {
         event: 'DELETE', schema: 'public', table: 'messages',
         filter: `match_id=eq.${matchId}`,
       }, (payload) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload?.sender !== userType) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setRemoteIsTyping(true);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          typingTimeoutRef.current = setTimeout(() => setRemoteIsTyping(false), 3000);
+          typingTimeoutRef.current = setTimeout(() => {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setRemoteIsTyping(false);
+          }, 3000);
         }
       })
       .subscribe();
@@ -169,21 +181,36 @@ export default function ChatScreen({ route, navigation }) {
     };
   }, [matchId, fetchMessages, userType]);
 
-  // Auto scroll
+  // Auto scroll on new messages
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     }
   }, [messages]);
 
-  // Keyboard scroll
+  // Keyboard scroll listener
   useEffect(() => {
     const sub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => { if (messages.length > 0) flatListRef.current?.scrollToEnd({ animated: true }); }
+      () => {
+        if (messages.length > 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 50);
+        }
+      }
     );
     return () => sub.remove();
   }, [messages]);
+
+  // Auto scroll to show remote user's typing dots
+  useEffect(() => {
+    if (remoteIsTyping && messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    }
+  }, [remoteIsTyping, messages.length]);
 
   // ── Broadcast typing (throttled 2s) ──
   const broadcastTyping = useCallback(() => {
@@ -218,6 +245,7 @@ export default function ChatScreen({ route, navigation }) {
       reply_to: replyId,
       created_at: new Date().toISOString(),
     };
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
@@ -227,10 +255,12 @@ export default function ChatScreen({ route, navigation }) {
       const { data, error } = await supabase.from('messages').insert(payload).select();
       if (error) throw error;
       if (data?.[0]) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setMessages((prev) => prev.map((msg) => (msg.id === optimisticMsg.id ? data[0] : msg)));
       }
     } catch (err) {
       Alert.alert('Send failed', err.message);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setMessages((prev) => prev.filter((msg) => msg.id !== optimisticMsg.id));
       setInputText(typedText);
     } finally {
@@ -247,6 +277,7 @@ export default function ChatScreen({ route, navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           // Optimistic remove
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setMessages((prev) => prev.filter((m) => m.id !== msgId));
           try {
             const { error } = await supabase.from('messages').delete().eq('id', msgId);
@@ -447,7 +478,21 @@ export default function ChatScreen({ route, navigation }) {
           showsVerticalScrollIndicator={false}
           onLayout={() => {
             if (messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: false });
+              if (isInitialLayout.current) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+                isInitialLayout.current = false;
+              } else {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 50);
+              }
+            }
+          }}
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 50);
             }
           }}
           ListFooterComponent={remoteIsTyping ? <TypingDots /> : null}

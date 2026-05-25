@@ -1,0 +1,33 @@
+name: EAS Update
+
+on:
+  push:
+    branches:
+      - main # Triggers the update whenever you push to your main branch
+
+jobs:
+  update:
+    name: Publish EAS Update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Expo & EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }} # Reads your Expo secret token from GitHub Secrets
+
+      - name: Publish EAS Update
+        run: eas update --branch preview --message "Automated update via GitHub Actions"
