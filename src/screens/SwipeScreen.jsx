@@ -468,8 +468,22 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         cv_url:              route.params?.cvUrl     ?? null,
         match_percent:       topJob.match ?? 0,
         status:              'Applied',
-      }).then(({ error }) => {
-        if (error) console.warn('[saveMatch]', error.message);
+      })
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[saveMatch]', error.message);
+          return;
+        }
+        // Trigger detailed AI analysis in the background immediately
+        fetch(`${getBackendUrl()}/api/analyze-match`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            record: data
+          })
+        }).catch(err => console.warn('[analyzeMatch trigger failed]', err));
       });
       if (onMatchLand) onMatchLand(topJob);
     }
