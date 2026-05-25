@@ -330,6 +330,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         const { data, error } = await supabase
           .from('jobs')
           .select('*')
+          .eq('status', 'Open')
           .order('created_at', { ascending: false });
         if (error) throw new Error(error.message);
         return data ?? [];
