@@ -62,6 +62,26 @@ const ALL_SKILLS = [
   'Swift', 'Kotlin', 'Go', 'GraphQL', 'Firebase',
 ];
 
+const getBackendUrl = () => {
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  // Dynamically resolve Metro host
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
+    if (match && match[1]) {
+      const host = match[1];
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:3000`;
+      }
+    }
+  }
+  return 'http://localhost:3000';
+};
+
+import { NativeModules } from 'react-native';
+
 export default function LoginScreen({ navigation, route }) {
   const [name, setName]               = useState('');
   const [role, setRole]               = useState(route.params?.role === 'employer' ? 'Employer' : '');
@@ -72,6 +92,7 @@ export default function LoginScreen({ navigation, route }) {
   const [cvUrl, setCvUrl]             = useState(null);
   const [cvName, setCvName]           = useState(null);
   const [cvUploading, setCvUploading] = useState(false);
+  const [aiParsing, setAiParsing]     = useState(false);
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
   const isEmployer = route.params?.role === 'employer';
@@ -117,10 +138,38 @@ export default function LoginScreen({ navigation, route }) {
       const { data } = supabase.storage.from('cvs').getPublicUrl(filename);
       setCvUrl(data.publicUrl);
       setCvName(file.name);
+      setCvUploading(false);
+
+      // Trigger AI parsing in the background
+      setAiParsing(true);
+      try {
+        const response = await fetch(`${getBackendUrl()}/api/parse-cv`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cvUrl: data.publicUrl }),
+        });
+
+        if (!response.ok) throw new Error('CV Parsing failed');
+        const parseData = await response.json();
+
+        if (parseData.success && parseData.profile) {
+          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills } = parseData.profile;
+          if (parsedName) setName(parsedName);
+          if (parsedRole) setRole(parsedRole);
+          if (parsedAbout) setAboutMe(parsedAbout);
+          if (Array.isArray(parsedSkills)) setSelectedSkills(parsedSkills);
+
+          Alert.alert('Genie Auto-Filled! ✨', 'Your profile details have been successfully extracted from your CV.');
+        }
+      } catch (parseErr) {
+        console.warn('CV Auto-fill failed:', parseErr);
+      } finally {
+        setAiParsing(false);
+      }
     } catch (err) {
       Alert.alert('Error', `Could not pick file: ${err?.message || err}`);
-    } finally {
       setCvUploading(false);
+      setAiParsing(false);
     }
   };
 
@@ -281,13 +330,27 @@ export default function LoginScreen({ navigation, route }) {
             <View style={styles.group}>
               <Text style={styles.label}>CV / RESUME</Text>
               <TouchableOpacity
-                style={[styles.cvBox, cvUrl && styles.cvBoxDone]}
+                style={[styles.cvBox, cvUrl && !aiParsing && styles.cvBoxDone]}
                 onPress={pickAndUploadCV}
-                disabled={cvUploading}
+                disabled={cvUploading || aiParsing}
                 activeOpacity={0.8}
               >
                 {cvUploading ? (
-                  <ActivityIndicator color={C.orange} size="small" />
+                  <>
+                    <ActivityIndicator color={C.orange} size="small" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cvUploadText}>Uploading CV...</Text>
+                      <Text style={styles.cvSubText}>Sending file to storage</Text>
+                    </View>
+                  </>
+                ) : aiParsing ? (
+                  <>
+                    <ActivityIndicator color={C.orange} size="small" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cvUploadText}>🧞‍♂️ Genie is reading your CV...</Text>
+                      <Text style={styles.cvSubText}>Auto-filling your profile details</Text>
+                    </View>
+                  </>
                 ) : cvUrl ? (
                   <>
                     <Text style={styles.cvIcon}>✅</Text>

@@ -70,6 +70,26 @@ const ALL_SKILLS = [
 ];
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 
+const getBackendUrl = () => {
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  // Dynamically resolve Metro host
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
+    if (match && match[1]) {
+      const host = match[1];
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:3000`;
+      }
+    }
+  }
+  return 'http://localhost:3000';
+};
+
+import { NativeModules } from 'react-native';
+
 export default function ProfileScreen({ route, navigation }) {
   const {
     userName    = 'You',
@@ -103,6 +123,7 @@ export default function ProfileScreen({ route, navigation }) {
   const [cvUrl, setCvUrl]             = useState(initialCvUrl);
   const [cvName, setCvName]           = useState(initialCvName);
   const [cvUploading, setCvUploading] = useState(false);
+  const [aiParsing, setAiParsing]     = useState(false);
 
   // Edit modal state
   const [editing, setEditing]         = useState(false);
@@ -175,15 +196,48 @@ export default function ProfileScreen({ route, navigation }) {
 
       if (uploadError) {
         Alert.alert('Upload Failed', uploadError.message);
+        setCvUploading(false);
         return;
       }
       const { data } = supabase.storage.from('cvs').getPublicUrl(filename);
       setCvUrl(data.publicUrl);
       setCvName(file.name);
+      setCvUploading(false);
+
+      // Trigger AI parsing in the background
+      setAiParsing(true);
+      try {
+        const response = await fetch(`${getBackendUrl()}/api/parse-cv`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cvUrl: data.publicUrl }),
+        });
+
+        if (!response.ok) throw new Error('CV Parsing failed');
+        const parseData = await response.json();
+
+        if (parseData.success && parseData.profile) {
+          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills } = parseData.profile;
+
+          setDraft(prev => ({
+            ...prev,
+            name: parsedName || prev.name,
+            role: parsedRole || prev.role,
+            about: parsedAbout || prev.about,
+            skills: Array.isArray(parsedSkills) ? parsedSkills : prev.skills,
+          }));
+
+          Alert.alert('Genie Auto-Filled! ✨', 'Your draft profile details have been updated from your CV.');
+        }
+      } catch (parseErr) {
+        console.warn('CV Auto-fill failed:', parseErr);
+      } finally {
+        setAiParsing(false);
+      }
     } catch (err) {
       Alert.alert('Error', `Could not pick file: ${err?.message || err}`);
-    } finally {
       setCvUploading(false);
+      setAiParsing(false);
     }
   };
 
@@ -435,11 +489,11 @@ export default function ProfileScreen({ route, navigation }) {
               {/* CV section */}
               <View style={styles.group}>
                 <Text style={styles.fieldLabel}>CV / RESUME</Text>
-                {cvUrl ? (
+                {cvUrl && !aiParsing ? (
                   <View style={styles.cvEditRow}>
                     <Text style={styles.cvIcon}>📄</Text>
                     <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'Uploaded CV'}</Text>
-                    <TouchableOpacity onPress={pickAndUploadCV} style={styles.cvReplaceBtn} disabled={cvUploading}>
+                    <TouchableOpacity onPress={pickAndUploadCV} style={styles.cvReplaceBtn} disabled={cvUploading || aiParsing}>
                       {cvUploading
                         ? <ActivityIndicator color={C.orange} size="small" />
                         : <Text style={styles.cvReplaceText}>Replace</Text>
@@ -453,11 +507,25 @@ export default function ProfileScreen({ route, navigation }) {
                   <TouchableOpacity
                     style={styles.cvPickBox}
                     onPress={pickAndUploadCV}
-                    disabled={cvUploading}
+                    disabled={cvUploading || aiParsing}
                     activeOpacity={0.8}
                   >
                     {cvUploading ? (
-                      <ActivityIndicator color={C.orange} size="small" />
+                      <>
+                        <ActivityIndicator color={C.orange} size="small" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cvPickText}>Uploading CV...</Text>
+                          <Text style={styles.cvPickSub}>Sending file to storage</Text>
+                        </View>
+                      </>
+                    ) : aiParsing ? (
+                      <>
+                        <ActivityIndicator color={C.orange} size="small" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cvPickText}>🧞‍♂️ Genie is reading your CV...</Text>
+                          <Text style={styles.cvPickSub}>Updating your draft details</Text>
+                        </View>
+                      </>
                     ) : (
                       <>
                         <Text style={styles.cvPickIcon}>📄</Text>
