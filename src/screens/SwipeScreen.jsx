@@ -305,9 +305,18 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const queueInitialized = useRef(false);
 
   // ── Initial job fetch (cached by React Query) ──────────────────────────────
-  // staleTime=5min: switching tabs and back won't trigger a redundant network call.
+  // key changes when profile details (like category or skills) are updated, triggering re-fetch.
+  const queryKey = [
+    'jobs',
+    route.params?.userName,
+    route.params?.userRole,
+    route.params?.category,
+    JSON.stringify(route.params?.skills || []),
+    route.params?.jobType
+  ];
+
   const { data: serverJobs = [], refetch, isLoading, isFetching } = useQuery({
-    queryKey: ['jobs'],
+    queryKey,
     queryFn:  async () => {
       try {
         const response = await fetch(`${getBackendUrl()}/api/match-jobs`, {
@@ -320,6 +329,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             skills: route.params?.skills,
             cvUrl: route.params?.cvUrl,
             jobType: route.params?.jobType,
+            category: route.params?.category,
           }),
         });
         if (!response.ok) throw new Error('API failed');
@@ -463,6 +473,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         job_id:              topJob.id,
         candidate_name:      route.params?.userName  ?? 'Professional',
         candidate_role:      route.params?.userRole  ?? '',
+        category:            route.params?.category  ?? null,
         about_me:            route.params?.aboutMe   ?? null,
         job_type_preference: route.params?.jobType   ?? null,
         skills:              route.params?.skills    ?? [],

@@ -62,6 +62,18 @@ const ALL_SKILLS = [
   'Swift', 'Kotlin', 'Go', 'GraphQL', 'Firebase',
 ];
 
+const CATEGORIES = [
+  { name: 'Tech & Software', emoji: '💻' },
+  { name: 'Design & Creative', emoji: '🎨' },
+  { name: 'Product & Project', emoji: '📊' },
+  { name: 'Data & Analytics', emoji: '📈' },
+  { name: 'Marketing & Sales', emoji: '✍️' },
+  { name: 'Business & Operations', emoji: '⚙️' },
+  { name: 'Finance & Accounting', emoji: '💰' },
+  { name: 'Human Resources', emoji: '👥' },
+  { name: 'Other', emoji: '💼' }
+];
+
 const getBackendUrl = () => {
   if (process.env.EXPO_PUBLIC_BACKEND_URL) {
     return process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -90,6 +102,8 @@ export default function LoginScreen({ navigation, route }) {
   const [jobType, setJobType]         = useState('Full-time');
   const [searchTarget, setSearchTarget] = useState('');
   const [selectedSkills, setSelectedSkills] = useState([]);
+  const [category, setCategory]       = useState('Tech & Software');
+  const [skillInput, setSkillInput]   = useState('');
   const [cvUrl, setCvUrl]             = useState(null);
   const [cvName, setCvName]           = useState(null);
   const [cvUploading, setCvUploading] = useState(false);
@@ -121,10 +135,16 @@ export default function LoginScreen({ navigation, route }) {
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
   const isEmployer = route.params?.role === 'employer';
 
-  const toggleSkill = (skill) => {
-    setSelectedSkills(prev =>
-      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
-    );
+  const handleAddSkill = () => {
+    const trimmed = skillInput.trim();
+    if (trimmed && !selectedSkills.includes(trimmed)) {
+      setSelectedSkills(prev => [...prev, trimmed]);
+    }
+    setSkillInput('');
+  };
+
+  const removeSkill = (skillToRemove) => {
+    setSelectedSkills(prev => prev.filter(s => s !== skillToRemove));
   };
 
   const pickAndUploadCV = async () => {
@@ -177,11 +197,12 @@ export default function LoginScreen({ navigation, route }) {
         const parseData = await response.json();
 
         if (parseData.success && parseData.profile) {
-          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills } = parseData.profile;
+          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills, category: parsedCategory } = parseData.profile;
           if (parsedName) setName(parsedName);
           if (parsedRole) setRole(parsedRole);
           if (parsedAbout) setAboutMe(parsedAbout);
           if (Array.isArray(parsedSkills)) setSelectedSkills(parsedSkills);
+          if (parsedCategory) setCategory(parsedCategory);
 
           Alert.alert('Genie Auto-Filled! ✨', 'Your profile details have been successfully extracted from your CV.');
         }
@@ -217,6 +238,7 @@ export default function LoginScreen({ navigation, route }) {
           userType:    isEmployer ? 'employer' : 'seeker',
           skills:      selectedSkills.length > 0 ? selectedSkills : ['JavaScript', 'React', 'Figma'],
           cvUrl:       cvUrl ?? null,
+          category:    isEmployer ? null : category,
         }
       }],
     });
@@ -368,32 +390,80 @@ export default function LoginScreen({ navigation, route }) {
             </View>
           )}
 
+          {/* Category Selector — seekers only */}
+          {!isEmployer && (
+            <View style={styles.group}>
+              <Text style={styles.label}>PROFESSIONAL CATEGORY</Text>
+              <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
+                {CATEGORIES.map((cat) => {
+                  const selected = category === cat.name;
+                  return (
+                    <TouchableOpacity
+                      key={cat.name}
+                      style={[styles.categoryPill, selected && styles.categoryPillActive]}
+                      onPress={() => setCategory(cat.name)}
+                      disabled={aiParsing}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                      <Text style={[styles.categoryText, selected && styles.categoryTextActive, aiParsing && { color: C.orange }]}>
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </Animated.View>
+            </View>
+          )}
+
           {/* Skills section — seekers only */}
           {!isEmployer && (
             <View style={styles.group}>
               <View style={styles.skillsHeader}>
                 <Text style={styles.label}>MY SKILLS</Text>
                 <Text style={styles.skillsCount}>
-                  {aiParsing ? "Genie is matching skills..." : selectedSkills.length > 0 ? `${selectedSkills.length} selected` : 'Tap to select'}
+                  {aiParsing ? "Genie is matching skills..." : `${selectedSkills.length} selected`}
                 </Text>
               </View>
-              <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
-                {ALL_SKILLS.map((skill) => {
-                  const selected = selectedSkills.includes(skill);
-                  return (
-                    <TouchableOpacity
-                      key={skill}
-                      style={[styles.skillPill, selected && styles.skillPillActive]}
-                      onPress={() => toggleSkill(skill)}
-                      disabled={aiParsing}
-                    >
-                      {selected && <Text style={styles.skillCheck}>✓ </Text>}
-                      <Text style={[styles.skillPillText, selected && styles.skillPillTextActive, aiParsing && { color: C.orange }]}>
-                        {skill}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+
+              {/* Skill Input Row */}
+              <View style={styles.skillInputContainer}>
+                <TextInput
+                  style={styles.skillTextInput}
+                  placeholder="e.g. Python, Figma, Copywriting"
+                  placeholderTextColor="#ABABAB"
+                  value={skillInput}
+                  onChangeText={setSkillInput}
+                  onSubmitEditing={handleAddSkill}
+                  editable={!aiParsing}
+                  autoCorrect={false}
+                />
+                <TouchableOpacity 
+                  style={styles.addSkillBtn} 
+                  onPress={handleAddSkill}
+                  disabled={aiParsing}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addSkillBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Dynamic Skills Tag Cloud */}
+              <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle, { marginTop: 4 }]}>
+                {selectedSkills.length > 0 ? (
+                  selectedSkills.map((skill) => (
+                    <View key={skill} style={styles.skillTag}>
+                      <Text style={styles.skillTagText}>{skill}</Text>
+                      <TouchableOpacity onPress={() => removeSkill(skill)} disabled={aiParsing}>
+                        <Text style={styles.skillTagDelete}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 13, color: '#ABABAB', fontStyle: 'italic', paddingLeft: 4 }}>
+                    No skills added yet. Type above to add, or auto-fill via CV.
+                  </Text>
+                )}
               </Animated.View>
             </View>
           )}
@@ -531,6 +601,84 @@ const styles = StyleSheet.create({
   skillCheck: { fontSize: 11, color: C.orange, fontWeight: '800' },
   skillPillText: { fontSize: 13, fontWeight: '600', color: C.muted },
   skillPillTextActive: { color: C.orange, fontWeight: '700' },
+
+  // Professional Category selection
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 40,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: '#fff',
+  },
+  categoryPillActive: {
+    backgroundColor: 'rgba(255,107,44,0.08)',
+    borderColor: C.orange,
+  },
+  categoryEmoji: { fontSize: 15 },
+  categoryText: { fontSize: 13, fontWeight: '600', color: C.muted },
+  categoryTextActive: { color: C.orange, fontWeight: '700' },
+
+  // Skill Input & Dynamic Tag Cloud
+  skillInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  skillTextInput: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    fontSize: 15,
+    color: '#1A1A1A',
+  },
+  addSkillBtn: {
+    backgroundColor: C.orange,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  addSkillBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  skillTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,44,0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,44,0.15)',
+  },
+  skillTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.orange,
+  },
+  skillTagDelete: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.orange,
+    paddingLeft: 2,
+  },
 
   cta: { borderRadius: 18, paddingVertical: 17, alignItems: 'center', marginTop: 4 },
   ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },

@@ -68,6 +68,19 @@ const ALL_SKILLS = [
   'Product Management', 'Data Analysis', 'AWS', 'Docker', 'Git',
   'Swift', 'Kotlin', 'Go', 'GraphQL', 'Firebase',
 ];
+
+const CATEGORIES = [
+  { name: 'Tech & Software', emoji: '💻' },
+  { name: 'Design & Creative', emoji: '🎨' },
+  { name: 'Product & Project', emoji: '📊' },
+  { name: 'Data & Analytics', emoji: '📈' },
+  { name: 'Marketing & Sales', emoji: '✍️' },
+  { name: 'Business & Operations', emoji: '⚙️' },
+  { name: 'Finance & Accounting', emoji: '💰' },
+  { name: 'Human Resources', emoji: '👥' },
+  { name: 'Other', emoji: '💼' }
+];
+
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 
 const getBackendUrl = () => {
@@ -103,6 +116,7 @@ export default function ProfileScreen({ route, navigation }) {
     cvUrl:  initialCvUrl  = null,
     cvName: initialCvName = null,
     userType,
+    category: initialCategory = 'Tech & Software',
   } = route.params || {};
   const isEmployer = userType === 'employer';
 
@@ -117,6 +131,7 @@ export default function ProfileScreen({ route, navigation }) {
     about:   aboutMe,
     jobType: jobType,
     skills:  defaultSkills,
+    category: initialCategory,
   });
 
   // CV state
@@ -124,6 +139,7 @@ export default function ProfileScreen({ route, navigation }) {
   const [cvName, setCvName]           = useState(initialCvName);
   const [cvUploading, setCvUploading] = useState(false);
   const [aiParsing, setAiParsing]     = useState(false);
+  const [skillInput, setSkillInput]   = useState('');
 
   const pulseOpacity = useSharedValue(1);
 
@@ -188,6 +204,15 @@ export default function ProfileScreen({ route, navigation }) {
   };
   const saveEdit = () => {
     setProfile({ ...draft });
+    // Sync profile back to parent Navigator route.params so Tab switches auto-reload properly
+    navigation.getParent()?.setParams({
+      userName: draft.name,
+      userRole: draft.role,
+      aboutMe: draft.about,
+      skills: draft.skills,
+      category: draft.category,
+      jobType: draft.jobType,
+    });
     closeEditModal();
   };
 
@@ -240,7 +265,7 @@ export default function ProfileScreen({ route, navigation }) {
         const parseData = await response.json();
 
         if (parseData.success && parseData.profile) {
-          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills } = parseData.profile;
+          const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills, category: parsedCategory } = parseData.profile;
 
           setDraft(prev => ({
             ...prev,
@@ -248,6 +273,7 @@ export default function ProfileScreen({ route, navigation }) {
             role: parsedRole || prev.role,
             about: parsedAbout || prev.about,
             skills: Array.isArray(parsedSkills) ? parsedSkills : prev.skills,
+            category: parsedCategory || prev.category,
           }));
 
           Alert.alert('Genie Auto-Filled! ✨', 'Your draft profile details have been updated from your CV.');
@@ -278,12 +304,21 @@ export default function ProfileScreen({ route, navigation }) {
     ]);
   };
 
-  const toggleDraftSkill = (skill) => {
+  const handleAddDraftSkill = () => {
+    const trimmed = skillInput.trim();
+    if (trimmed && !draft.skills.includes(trimmed)) {
+      setDraft(prev => ({
+        ...prev,
+        skills: [...prev.skills, trimmed]
+      }));
+    }
+    setSkillInput('');
+  };
+
+  const removeDraftSkill = (skillToRemove) => {
     setDraft(prev => ({
       ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter(s => s !== skill)
-        : [...prev.skills, skill],
+      skills: prev.skills.filter(s => s !== skillToRemove)
     }));
   };
 
@@ -316,7 +351,7 @@ export default function ProfileScreen({ route, navigation }) {
             </Text>
           </View>
           <Text style={styles.pName}>{profile.name}</Text>
-          <Text style={styles.pRole}>{profile.role}</Text>
+          <Text style={styles.pRole}>{profile.role} {isEmployer ? '' : `· ${profile.category}`}</Text>
           {profile.about ? (
             <Text style={styles.pBio} numberOfLines={2}>{profile.about}</Text>
           ) : null}
@@ -359,6 +394,7 @@ export default function ProfileScreen({ route, navigation }) {
           <Text style={styles.sectionLabel}>JOB PREFERENCES</Text>
           {[
             { label: 'Looking for',  val: profile.jobType },
+            ...(isEmployer ? [] : [{ label: 'Category', val: profile.category }]),
             { label: 'Availability', val: 'Immediate' },
             { label: 'Remote OK?',   val: 'Yes 🌍' },
           ].map(({ label, val }) => (
@@ -495,33 +531,83 @@ export default function ProfileScreen({ route, navigation }) {
                 </View>
               </View>
 
-              {/* Skills */}
-              <View style={styles.group}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={styles.fieldLabel}>MY SKILLS</Text>
-                  <Text style={[styles.fieldLabel, { color: C.orange }]}>
-                    {aiParsing ? "Genie matching skills..." : `${draft.skills.length} selected`}
-                  </Text>
+              {/* Category selector — seekers only */}
+              {!isEmployer && (
+                <View style={styles.group}>
+                  <Text style={styles.fieldLabel}>PROFESSIONAL CATEGORY</Text>
+                  <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
+                    {CATEGORIES.map((cat) => {
+                      const selected = draft.category === cat.name;
+                      return (
+                        <TouchableOpacity
+                          key={cat.name}
+                          style={[styles.categoryPill, selected && styles.categoryPillActive]}
+                          onPress={() => setDraft(prev => ({ ...prev, category: cat.name }))}
+                          disabled={aiParsing}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                          <Text style={[styles.categoryText, selected && styles.categoryTextActive, aiParsing && { color: C.orange }]}>
+                            {cat.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </Animated.View>
                 </View>
-                <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle]}>
-                  {ALL_SKILLS.map(skill => {
-                    const selected = draft.skills.includes(skill);
-                    return (
-                      <TouchableOpacity
-                        key={skill}
-                        style={[styles.skillPill, selected && styles.skillPillActive]}
-                        onPress={() => toggleDraftSkill(skill)}
-                        disabled={aiParsing}
-                      >
-                        {selected && <Text style={styles.skillCheck}>✓ </Text>}
-                        <Text style={[styles.skillPillText, selected && styles.skillPillActiveText, aiParsing && { color: C.orange }]}>
-                          {skill}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </Animated.View>
-              </View>
+              )}
+
+              {/* Skills */}
+              {!isEmployer && (
+                <View style={styles.group}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={styles.fieldLabel}>MY SKILLS</Text>
+                    <Text style={[styles.fieldLabel, { color: C.orange }]}>
+                      {aiParsing ? "Genie matching skills..." : `${draft.skills.length} selected`}
+                    </Text>
+                  </View>
+
+                  {/* Skill Input Row */}
+                  <View style={styles.skillInputContainer}>
+                    <TextInput
+                      style={styles.skillTextInput}
+                      placeholder="e.g. Python, Figma, Copywriting"
+                      placeholderTextColor="#ABABAB"
+                      value={skillInput}
+                      onChangeText={setSkillInput}
+                      onSubmitEditing={handleAddDraftSkill}
+                      editable={!aiParsing}
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity 
+                      style={styles.addSkillBtn} 
+                      onPress={handleAddDraftSkill}
+                      disabled={aiParsing}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.addSkillBtnText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Dynamic Skills Tag Cloud */}
+                  <Animated.View style={[styles.pillRow, aiParsing && animatedPulseStyle, { marginTop: 4 }]}>
+                    {draft.skills.length > 0 ? (
+                      draft.skills.map((skill) => (
+                        <View key={skill} style={styles.skillTag}>
+                          <Text style={styles.skillTagText}>{skill}</Text>
+                          <TouchableOpacity onPress={() => removeDraftSkill(skill)} disabled={aiParsing}>
+                            <Text style={styles.skillTagDelete}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={{ fontSize: 13, color: '#ABABAB', fontStyle: 'italic', paddingLeft: 4 }}>
+                        No skills added yet. Type above to add, or auto-fill via CV.
+                      </Text>
+                    )}
+                  </Animated.View>
+                </View>
+              )}
 
               {/* CV section */}
               <View style={styles.group}>
@@ -748,6 +834,84 @@ const styles = StyleSheet.create({
   skillCheck: { fontSize: 11, color: C.orange, fontWeight: '800' },
   skillPillText: { fontSize: 13, fontWeight: '600', color: C.muted },
   skillPillActiveText: { color: C.orange },
+
+  // Professional Category selection
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 40,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: '#fff',
+  },
+  categoryPillActive: {
+    backgroundColor: 'rgba(255,107,44,0.08)',
+    borderColor: C.orange,
+  },
+  categoryEmoji: { fontSize: 15 },
+  categoryText: { fontSize: 13, fontWeight: '600', color: C.muted },
+  categoryTextActive: { color: C.orange, fontWeight: '700' },
+
+  // Skill Input & Dynamic Tag Cloud
+  skillInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  skillTextInput: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    fontSize: 15,
+    color: '#1A1A1A',
+  },
+  addSkillBtn: {
+    backgroundColor: C.orange,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  addSkillBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  skillTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,44,0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,44,0.15)',
+  },
+  skillTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.orange,
+  },
+  skillTagDelete: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.orange,
+    paddingLeft: 2,
+  },
 
   saveCta: { borderRadius: 18, paddingVertical: 17, alignItems: 'center' },
   saveCtaText: { color: '#fff', fontSize: 16, fontWeight: '700' },

@@ -146,8 +146,21 @@ export default function EmployerScreen({ route }) {
   const [formRole, setFormRole]       = useState('');
   const [formSalary, setFormSalary]   = useState('');
   const [formJobType, setFormJobType] = useState('Full-time');
+  const [formCategory, setFormCategory] = useState('Tech & Software');
   const [formRemote, setFormRemote]   = useState(false);
   const [submitting, setSubmitting]   = useState(false);
+
+  const CATEGORIES = [
+    'Tech & Software',
+    'Design & Creative',
+    'Product & Project',
+    'Data & Analytics',
+    'Marketing & Sales',
+    'Business & Operations',
+    'Finance & Accounting',
+    'Human Resources',
+    'Other'
+  ];
 
   // ── Bottom sheet ───────────────────────────────────────────────────────────
   const sheetRef = useRef(null);
@@ -262,6 +275,7 @@ export default function EmployerScreen({ route }) {
         company:    userName || 'My Company',
         salary:     formSalary.trim() || null,
         job_type:   formJobType,
+        category:   formCategory,
         emoji:      randomEmoji,
         colors:     randomColors,
         match:      randomMatch,
@@ -277,6 +291,7 @@ export default function EmployerScreen({ route }) {
       setFormRole('');
       setFormSalary('');
       setFormJobType('Full-time');
+      setFormCategory('Tech & Software');
       setFormRemote(false);
       closeSheet();
       fetchJobs(true);
@@ -285,7 +300,7 @@ export default function EmployerScreen({ route }) {
     } finally {
       setSubmitting(false);
     }
-  }, [formRole, formSalary, formJobType, formRemote, closeSheet, fetchJobs, userName]);
+  }, [formRole, formSalary, formJobType, formCategory, formRemote, closeSheet, fetchJobs, userName]);
 
   // ── Render helpers ─────────────────────────────────────────────────────────
   const renderItem = useCallback(({ item }) => <JobCard item={item} />, []);
@@ -409,6 +424,25 @@ export default function EmployerScreen({ route }) {
                   onChangeText={setFormSalary}
                   autoCorrect={false}
                 />
+              </View>
+
+              {/* Job category selection pills */}
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>JOB CATEGORY</Text>
+                <View style={styles.pillRow}>
+                  {CATEGORIES.map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.pill, formCategory === c && styles.pillActive]}
+                      onPress={() => setFormCategory(c)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.pillText, formCategory === c && styles.pillTextActive]}>
+                        {c}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               {/* Job type selection pills */}
