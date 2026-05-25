@@ -159,6 +159,7 @@ export default function EmployerScreen({ route }) {
     'Business & Operations',
     'Finance & Accounting',
     'Human Resources',
+    'Supply Chain & Logistics',
     'Other'
   ];
 

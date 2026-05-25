@@ -78,6 +78,7 @@ const CATEGORIES = [
   { name: 'Business & Operations', emoji: '⚙️' },
   { name: 'Finance & Accounting', emoji: '💰' },
   { name: 'Human Resources', emoji: '👥' },
+  { name: 'Supply Chain & Logistics', emoji: '📦' },
   { name: 'Other', emoji: '💼' }
 ];
 
