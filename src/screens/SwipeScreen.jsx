@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal, Pressable, Dimensions, Platform, NativeModules,
+  ActivityIndicator,
 } from 'react-native';
 
 const getBackendUrl = () => {
@@ -30,7 +31,7 @@ const getBackendUrl = () => {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  interpolate, runOnJS,
+  interpolate, runOnJS, withRepeat, withSequence,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -263,6 +264,37 @@ function LeavingCard({ item, onComplete }) {
   );
 }
 
+/* ─── Pulsing Loading Indicator for Job Cards ─── */
+function LoadingPulse() {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 800 }),
+        withTiming(1.0, { duration: 800 })
+      ),
+      -1,
+      true
+    );
+  }, [scale]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  return (
+    <View style={styles.pulseContainer}>
+      <Animated.View style={[styles.pulseCircle, animatedStyle]}>
+        <Text style={styles.pulseEmoji}>🧞‍♂️</Text>
+      </Animated.View>
+      <ActivityIndicator size="small" color={C.orange} style={{ marginTop: 24 }} />
+    </View>
+  );
+}
+
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
@@ -274,7 +306,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
   // ── Initial job fetch (cached by React Query) ──────────────────────────────
   // staleTime=5min: switching tabs and back won't trigger a redundant network call.
-  const { data: serverJobs = [], refetch } = useQuery({
+  const { data: serverJobs = [], refetch, isLoading, isFetching } = useQuery({
     queryKey: ['jobs'],
     queryFn:  async () => {
       try {
@@ -320,6 +352,8 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       setJobs(data);
     }
   };
+
+  const showLoadingSpinner = isLoading || (isFetching && jobs.length === 0);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -555,7 +589,13 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
       {/* Card Deck */}
       <View style={styles.deck}>
-        {jobs.length === 0 ? (
+        {showLoadingSpinner ? (
+          <View style={styles.loadingDeck}>
+            <LoadingPulse />
+            <Text style={styles.loadingTitle}>Summoning jobs...</Text>
+            <Text style={styles.loadingSubtitle}>Evaluating your CV and skills with Gemini AI</Text>
+          </View>
+        ) : jobs.length === 0 ? (
           <View style={styles.emptyDeck}>
             <Text style={styles.emptyIcon}>🧞‍♂️</Text>
             <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
@@ -917,4 +957,47 @@ const styles = StyleSheet.create({
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   tag: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
   tagText: { fontSize: 11, fontWeight: '600' },
+
+  // Loading Screen Styles
+  loadingDeck: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: C.night,
+    marginTop: 16,
+    letterSpacing: -0.4,
+  },
+  loadingSubtitle: {
+    fontSize: 13,
+    color: C.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  pulseContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  pulseEmoji: {
+    fontSize: 48,
+  },
 });

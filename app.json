@@ -30,17 +30,17 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "extra": {
       "eas": {
-        "projectId": "edcb6b96-10f7-4769-a610-160094ad588f"
+        "projectId": "5d4538d6-df3f-4366-a08c-fcc61d7da767"
       }
     },
     "owner": "kodx-dev",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "updates": {
-      "url": "https://u.expo.dev/edcb6b96-10f7-4769-a610-160094ad588f"
+      "url": "https://u.expo.dev/5d4538d6-df3f-4366-a08c-fcc61d7da767"
     }
   }
 }
