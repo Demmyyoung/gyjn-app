@@ -223,39 +223,66 @@ export default function LoginScreen({ navigation, route }) {
     }
   };
 
-  const navigateToMain = (overrideName) => {
+  const navigateToMain = async (overrideName) => {
     const resolvedName = overrideName || name.trim();
     if (!resolvedName) return;
-    navigation.reset({
-      index: 0,
-      routes: [{
-        name: 'Main',
-        params: {
-          userName:    resolvedName,
-          userRole:    role.trim() || (isEmployer ? 'Employer' : 'Professional'),
-          jobType,
-          aboutMe,
-          searchTarget,
-          userType:    isEmployer ? 'employer' : 'seeker',
-          skills:      selectedSkills.length > 0 ? selectedSkills : ['JavaScript', 'React', 'Figma'],
-          cvUrl:       cvUrl ?? null,
-          category:    isEmployer ? null : category,
-        }
-      }],
-    });
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Not Authenticated', 'You must be logged in to save your profile.');
+        return;
+      }
+      
+      const profile = {
+        id:            user.id,
+        user_name:     resolvedName,
+        user_role:     role.trim() || (isEmployer ? 'Employer' : 'Professional'),
+        job_type:      jobType,
+        about_me:      aboutMe,
+        search_target: searchTarget,
+        user_type:     isEmployer ? 'employer' : 'seeker',
+        skills:        selectedSkills.length > 0 ? selectedSkills : ['JavaScript', 'React', 'Figma'],
+        cv_url:        cvUrl ?? null,
+        category:      isEmployer ? null : category,
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(profile);
+
+      if (error) {
+        Alert.alert('Error saving profile', error.message);
+        return;
+      }
+
+      navigation.reset({
+        index: 0,
+        routes: [{
+          name: 'Main',
+          params: profile
+        }],
+      });
+    } catch (err) {
+      Alert.alert('Error', err.message || JSON.stringify(err));
+    }
   };
 
   const handleSubmit = () => {
     if (!name.trim()) return;
-    navigateToMain();
-  };
-
-  const handleGoogleSignIn = () => {
-    Alert.alert(
-      'Google Sign-In',
-      'Connect your Google OAuth credentials in LoginScreen.jsx to enable this.',
-      [{ text: 'OK' }]
-    );
+    
+    if (!isEmployer && !cvUrl) {
+      Alert.alert(
+        '⚠️ Heads up!',
+        'Without a CV, our matching algorithm has less information to work with. Your match scores may be lower than candidates with a full profile.',
+        [
+          { text: 'Upload CV', style: 'cancel', onPress: pickAndUploadCV },
+          { text: 'Continue anyway', style: 'default', onPress: () => navigateToMain() }
+        ]
+      );
+    } else {
+      navigateToMain();
+    }
   };
 
   return (
@@ -522,17 +549,6 @@ export default function LoginScreen({ navigation, route }) {
             <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Text style={styles.ctaText}>Let's Go ✨</Text>
             </LinearGradient>
-          </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or sign up with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn} activeOpacity={0.8}>
-            <Text style={styles.socialIcon}>G</Text>
-            <Text style={styles.socialText}>Continue with Google</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

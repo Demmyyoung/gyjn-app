@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal, Pressable, Dimensions, Platform, NativeModules,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from 'react-native';
 
 const getBackendUrl = () => {
@@ -31,11 +31,12 @@ const getBackendUrl = () => {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  interpolate, runOnJS, withRepeat, withSequence,
+  interpolate, runOnJS, withRepeat, withSequence, interpolateColor,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -60,6 +61,36 @@ const C = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+const getNotifStyle = (type) => {
+  switch (type) {
+    case 'Interviewing':
+      return {
+        bg: '#FFF9E6',
+        border: 'rgba(255, 179, 0, 0.4)',
+        text: '#D97706',
+        emoji: '🎯',
+        label: "You've been moved to the Interviewing section!",
+      };
+    case 'Hired':
+      return {
+        bg: '#E6F9F0',
+        border: 'rgba(0, 200, 150, 0.4)',
+        text: '#059669',
+        emoji: '🏆',
+        label: 'Congratulations! You have been hired!',
+      };
+    case 'Message':
+    default:
+      return {
+        bg: '#F3E8FF',
+        border: 'rgba(123, 79, 233, 0.4)',
+        text: '#7E22CE',
+        emoji: '💬',
+        label: 'New message received',
+      };
+  }
+};
 
 const TAG_COLORS = {
   green:   { bg: 'rgba(0, 200, 150, 0.12)', text: C.green }, // apply-green
@@ -298,11 +329,17 @@ function LoadingPulse() {
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
+  const insets = useSafeAreaInsets();
   const [jobs, setJobs] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
   const [detailJob, setDetailJob] = useState(null);
   const [exitingCards, setExitingCards] = useState([]);
   const queueInitialized = useRef(false);
+
+  const [activeNotification, setActiveNotification] = useState(null);
+  const [cachedNotification, setCachedNotification] = useState(null);
+
+  const progress = useSharedValue(0);
 
   // ── Initial job fetch (cached by React Query) ──────────────────────────────
   // key changes when profile details (like category or skills) are updated, triggering re-fetch.
@@ -318,18 +355,34 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const { data: serverJobs = [], refetch, isLoading, isFetching } = useQuery({
     queryKey,
     queryFn:  async () => {
+      // Fetch live profile to override route.params if they are empty
+      let activeProfile = {};
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          if (data) activeProfile = data;
+        }
+      } catch (err) {
+        console.warn('Failed to load profile for queryFn:', err);
+      }
+
       try {
         const response = await fetch(`${getBackendUrl()}/api/match-jobs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: route.params?.userName,
-            role: route.params?.userRole,
-            aboutMe: route.params?.aboutMe,
-            skills: route.params?.skills,
-            cvUrl: route.params?.cvUrl,
-            jobType: route.params?.jobType,
-            category: route.params?.category,
+            name: activeProfile.user_name || route.params?.userName,
+            role: activeProfile.user_role || route.params?.userRole,
+            aboutMe: activeProfile.about_me || route.params?.aboutMe,
+            skills: activeProfile.skills || route.params?.skills,
+            cvUrl: activeProfile.cv_url || route.params?.cvUrl,
+            jobType: activeProfile.job_type || route.params?.jobType,
+            category: activeProfile.category || route.params?.category,
           }),
         });
         if (!response.ok) throw new Error('API failed');
@@ -356,6 +409,116 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       setJobs(serverJobs);
     }
   }, [serverJobs]);
+
+  // Realtime notification listener
+  useEffect(() => {
+    const userDisplayName = route.params?.userName || 'Professional';
+    
+    const channel = supabase
+      .channel('candidate-notifications')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'matches' },
+        async (payload) => {
+          if (payload.new.candidate_name === userDisplayName) {
+            const oldStatus = payload.old?.status;
+            const newStatus = payload.new?.status;
+            if (newStatus !== oldStatus && (newStatus === 'Interviewing' || newStatus === 'Hired')) {
+              const { data: matchData, error } = await supabase
+                .from('matches')
+                .select('*, jobs(*), messages(*)')
+                .eq('match_id', payload.new.match_id)
+                .single();
+              
+              if (!error && matchData) {
+                // Check if there is a recent message from the employer (within 8 seconds)
+                const msgs = matchData.messages || [];
+                const employerMsgs = msgs.filter(m => m.sender_type === 'employer');
+                const lastMsg = employerMsgs[employerMsgs.length - 1];
+                const isRecentMessage = lastMsg && 
+                  (Date.now() - new Date(lastMsg.created_at).getTime() < 8000);
+
+                if (isRecentMessage) {
+                  setActiveNotification({
+                    type: 'Message',
+                    company: matchData.jobs?.company || 'Company',
+                    role: matchData.jobs?.role || 'Role',
+                    emoji: '💬',
+                    text: lastMsg.text,
+                    match: matchData,
+                  });
+                } else {
+                  setActiveNotification({
+                    type: newStatus,
+                    company: matchData.jobs?.company || 'Company',
+                    role: matchData.jobs?.role || 'Role',
+                    emoji: matchData.jobs?.emoji || '💼',
+                    match: matchData,
+                  });
+                }
+              }
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        async (payload) => {
+          if (payload.new.sender_type === 'employer') {
+            const { data: matchData, error } = await supabase
+              .from('matches')
+              .select('*, jobs(*)')
+              .eq('match_id', payload.new.match_id)
+              .single();
+            
+            if (!error && matchData && matchData.candidate_name === userDisplayName) {
+              setActiveNotification({
+                type: 'Message',
+                company: matchData.jobs?.company || 'Company',
+                role: matchData.jobs?.role || 'Role',
+                emoji: '💬',
+                text: payload.new.text,
+                match: matchData,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [route.params?.userName]);
+
+  // Manage thought bubble animation transitions and auto-dismiss timer
+  useEffect(() => {
+    if (activeNotification) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCachedNotification(activeNotification);
+      progress.value = withSpring(1, { damping: 26, stiffness: 240, mass: 0.4 });
+      
+      const timer = setTimeout(() => {
+        setActiveNotification(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    } else {
+      progress.value = withSpring(0, { damping: 30, stiffness: 280, mass: 0.4 });
+    }
+  }, [activeNotification]);
+
+  const handleNotifPress = () => {
+    if (activeNotification?.match) {
+      const matchData = activeNotification.match;
+      setActiveNotification(null);
+      navigation.navigate('Chat', { 
+        match: matchData, 
+        userName: route.params?.userName, 
+        userType: 'candidate' 
+      });
+    }
+  };
 
   const handleReload = async () => {
     const { data } = await refetch();
@@ -427,6 +590,176 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     transform: [{ translateY: sheetTranslateY.value }],
   }));
 
+  const morphingContainerStyle = useAnimatedStyle(() => {
+    const currentWidth = interpolate(progress.value, [0, 1], [40, SCREEN_W - 48]);
+    const currentHeight = interpolate(progress.value, [0, 1], [40, 86]);
+    const currentRadius = interpolate(progress.value, [0, 1], [20, 22]);
+
+    let targetBg = '#ffffff';
+    let targetBorder = '#F2EDE8';
+    
+    if (cachedNotification) {
+      if (cachedNotification.type === 'Interviewing') {
+        targetBg = '#FFF9E6';
+        targetBorder = '#FFB300';
+      } else if (cachedNotification.type === 'Hired') {
+        targetBg = '#E6F9F0';
+        targetBorder = '#00C896';
+      } else {
+        targetBg = '#F3E8FF';
+        targetBorder = '#7B4FE9';
+      }
+    }
+
+    const currentBg = interpolateColor(
+      progress.value,
+      [0, 1],
+      ['#ffffff', targetBg]
+    );
+
+    const currentBorderColor = interpolateColor(
+      progress.value,
+      [0, 1],
+      ['#F2EDE8', targetBorder]
+    );
+
+    let targetShadowColor = C.night;
+    let targetShadowOpacity = 0.08;
+    let targetShadowRadius = 6;
+    let targetElevation = 3;
+
+    if (cachedNotification) {
+      if (cachedNotification.type === 'Interviewing') {
+        targetShadowColor = C.gold;
+      } else if (cachedNotification.type === 'Hired') {
+        targetShadowColor = C.green;
+      } else {
+        targetShadowColor = C.purple;
+      }
+      targetShadowOpacity = 0.16;
+      targetShadowRadius = 14;
+      targetElevation = 8;
+    }
+
+    const currentShadowOpacity = interpolate(progress.value, [0, 1], [0.08, targetShadowOpacity]);
+    const currentShadowRadius = interpolate(progress.value, [0, 1], [6, targetShadowRadius]);
+    const currentElevation = interpolate(progress.value, [0, 1], [3, targetElevation]);
+
+    return {
+      width: currentWidth,
+      height: currentHeight,
+      borderRadius: currentRadius,
+      backgroundColor: currentBg,
+      borderColor: currentBorderColor,
+      shadowColor: targetShadowColor,
+      shadowOpacity: currentShadowOpacity,
+      shadowRadius: currentShadowRadius,
+      elevation: currentElevation,
+      position: 'absolute',
+      right: 24,
+      top: Math.max(insets.top, 8),
+      zIndex: 999,
+      overflow: 'hidden',
+      borderWidth: 1.5,
+      justifyContent: 'center',
+    };
+  });
+
+  const collapsedLayerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(progress.value, [0, 0.25], [1, 0], 'clamp'),
+      transform: [{ scale: interpolate(progress.value, [0, 0.25], [1, 0.5], 'clamp') }],
+    };
+  });
+
+  const expandedLayerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(progress.value, [0.75, 1], [0, 1], 'clamp'),
+      transform: [{ scale: interpolate(progress.value, [0.75, 1], [0.95, 1], 'clamp') }],
+    };
+  });
+
+  const dot1Style = useAnimatedStyle(() => {
+    let targetBg = 'rgba(255, 255, 255, 0.9)';
+    let targetBorder = 'rgba(0,0,0,0.05)';
+    if (cachedNotification) {
+      if (cachedNotification.type === 'Interviewing') {
+        targetBg = 'rgba(255, 249, 230, 0.9)';
+        targetBorder = 'rgba(255, 179, 0, 0.4)';
+      } else if (cachedNotification.type === 'Hired') {
+        targetBg = 'rgba(230, 249, 240, 0.9)';
+        targetBorder = 'rgba(0, 200, 150, 0.4)';
+      } else {
+        targetBg = 'rgba(243, 232, 255, 0.9)';
+        targetBorder = 'rgba(123, 79, 233, 0.4)';
+      }
+    }
+
+    return {
+      opacity: progress.value,
+      transform: [
+        { scale: progress.value },
+        { translateY: interpolate(progress.value, [0, 1], [-20, 0]) },
+        { translateX: interpolate(progress.value, [0, 1], [15, 0]) }
+      ],
+      backgroundColor: targetBg,
+      borderColor: targetBorder,
+      borderWidth: 1.5,
+      position: 'absolute',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      right: 48,
+      top: Math.max(insets.top, 8) + 84,
+      zIndex: 998,
+    };
+  });
+
+  const dot2Style = useAnimatedStyle(() => {
+    let targetBg = 'rgba(255, 255, 255, 0.9)';
+    let targetBorder = 'rgba(0,0,0,0.05)';
+    if (cachedNotification) {
+      if (cachedNotification.type === 'Interviewing') {
+        targetBg = 'rgba(255, 249, 230, 0.9)';
+        targetBorder = 'rgba(255, 179, 0, 0.4)';
+      } else if (cachedNotification.type === 'Hired') {
+        targetBg = 'rgba(230, 249, 240, 0.9)';
+        targetBorder = 'rgba(0, 200, 150, 0.4)';
+      } else {
+        targetBg = 'rgba(243, 232, 255, 0.9)';
+        targetBorder = 'rgba(123, 79, 233, 0.4)';
+      }
+    }
+
+    return {
+      opacity: progress.value,
+      transform: [
+        { scale: progress.value },
+        { translateY: interpolate(progress.value, [0, 1], [-30, 0]) },
+        { translateX: interpolate(progress.value, [0, 1], [25, 0]) }
+      ],
+      backgroundColor: targetBg,
+      borderColor: targetBorder,
+      borderWidth: 1.5,
+      position: 'absolute',
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      right: 36,
+      top: Math.max(insets.top, 8) + 102,
+      zIndex: 997,
+    };
+  });
+
+  const handleMorphingBtnPress = () => {
+    if (activeNotification) {
+      handleNotifPress();
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      navigation.navigate('Profile');
+    }
+  };
+
   const { userName } = route.params || { userName: 'Professional' };
 
   // Sync indexOffset back to 0 when React finishes updating the jobs array.
@@ -467,36 +800,67 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       return remaining;
     });
 
+    // Increment local swipes count
+    const incrementSwipes = async () => {
+      try {
+        const count = await AsyncStorage.getItem('seeker_swipes_count');
+        const nextCount = count ? parseInt(count) + 1 : 1;
+        await AsyncStorage.setItem('seeker_swipes_count', nextCount.toString());
+      } catch (err) {
+        console.warn('Failed to increment local swipes count:', err);
+      }
+    };
+    incrementSwipes();
+
     if (direction === 'right') {
-      // Persist match to Supabase
-      supabase.from('matches').insert({
-        job_id:              topJob.id,
-        candidate_name:      route.params?.userName  ?? 'Professional',
-        candidate_role:      route.params?.userRole  ?? '',
-        category:            route.params?.category  ?? null,
-        about_me:            route.params?.aboutMe   ?? null,
-        job_type_preference: route.params?.jobType   ?? null,
-        skills:              route.params?.skills    ?? [],
-        cv_url:              route.params?.cvUrl     ?? null,
-        match_percent:       topJob.match ?? 0,
-        status:              'Applied',
-      })
-      .select()
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          console.warn('[saveMatch]', error.message);
-          return;
-        }
-        // Trigger detailed AI analysis in the background immediately
-        fetch(`${getBackendUrl()}/api/analyze-match`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            record: data
+      const saveMatch = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          let activeProfile = {};
+          if (user) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            if (data) activeProfile = data;
+          }
+
+          const { data, error } = await supabase.from('matches').insert({
+            job_id:              topJob.id,
+            candidate_name:      activeProfile.user_name || route.params?.userName || 'Professional',
+            candidate_role:      activeProfile.user_role || route.params?.userRole || '',
+            category:            activeProfile.category || route.params?.category || null,
+            about_me:            activeProfile.about_me || route.params?.aboutMe || null,
+            job_type_preference: activeProfile.job_type || route.params?.jobType || null,
+            skills:              activeProfile.skills || route.params?.skills || [],
+            cv_url:              activeProfile.cv_url || route.params?.cvUrl || null,
+            match_percent:       topJob.match ?? 0,
+            status:              'Applied',
           })
-        }).catch(err => console.warn('[analyzeMatch trigger failed]', err));
-      });
+          .select()
+          .single();
+
+          if (error) {
+            console.warn('[saveMatch]', error.message);
+            Alert.alert('Apply Failed', 'Could not apply to this role. Please check your connection or try again later. Error: ' + error.message);
+            return;
+          }
+
+          // Trigger detailed AI analysis in the background immediately
+          fetch(`${getBackendUrl()}/api/analyze-match`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              record: data
+            })
+          }).catch(err => console.warn('[analyzeMatch trigger failed]', err));
+        } catch (err) {
+          console.warn('Failed to save match to database:', err);
+        }
+      };
+
+      saveMatch();
       if (onMatchLand) onMatchLand(topJob);
     }
   }, [jobs, route.params, onMatchLand, translateX, translateY]);
@@ -571,7 +935,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   // ── Render ────────────────────────────────────────────────────────────────
   const VISIBLE_COUNT = 3;
   const renderCount = Math.min(jobs.length, VISIBLE_COUNT + 1);
-  const insets = useSafeAreaInsets();
 
   const renderCards = () => {
     if (jobs.length === 0) return null;
@@ -602,16 +965,92 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
   return (
     <View style={styles.container}>
-      {/* Header — logo center, filter right */}
+      {/* Header — logo center, placeholders on sides */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={{ width: 40 }} />
         <Text style={styles.logo}>🧞‍♂️ Jinni</Text>
-        <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
-          <View style={styles.filterBtnCircle}>
-            <Text style={styles.filterIcon}>☰</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
+
+      {/* Morphing Liquid-Glass Notification Button */}
+      <Animated.View style={morphingContainerStyle}>
+        {/* Collapsed Menu State */}
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, collapsedLayerStyle, { alignItems: 'center', justifyContent: 'center' }]}
+          pointerEvents={activeNotification ? "none" : "auto"}
+        >
+          <TouchableOpacity 
+            style={styles.filterBtn} 
+            activeOpacity={0.7}
+            onPress={handleMorphingBtnPress}
+          >
+            <View style={styles.filterBtnCircle}>
+              <Text style={styles.filterIcon}>☰</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Expanded Notification State */}
+        <Animated.View 
+          style={[StyleSheet.absoluteFill, expandedLayerStyle]}
+          pointerEvents={activeNotification ? "auto" : "none"}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 12 }} 
+            activeOpacity={0.95}
+            onPress={handleMorphingBtnPress}
+          >
+            {/* Liquid Glass Shine Overlay */}
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0.05)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.notifCloseBtn} 
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveNotification(null);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.notifCloseText}>✕</Text>
+            </TouchableOpacity>
+
+            {/* Notification Header Row */}
+            <View style={styles.notifBubbleRow}>
+              <Text style={styles.notifBubbleEmoji}>
+                {cachedNotification ? getNotifStyle(cachedNotification.type).emoji : '💼'}
+              </Text>
+              <Text style={styles.notifBubbleTitle} numberOfLines={1}>
+                {cachedNotification ? `${cachedNotification.company} · ${cachedNotification.role}` : ''}
+              </Text>
+            </View>
+
+            {/* Notification Body Text */}
+            <Text 
+              style={[
+                styles.notifBubbleText, 
+                { color: cachedNotification ? getNotifStyle(cachedNotification.type).text : C.night }
+              ]} 
+              numberOfLines={2}
+            >
+              {cachedNotification 
+                ? (cachedNotification.type === 'Message' ? cachedNotification.text : getNotifStyle(cachedNotification.type).label)
+                : ''}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Thought Bubble Satellite Dots */}
+      <Animated.View style={dot1Style} pointerEvents="none" />
+      <Animated.View style={dot2Style} pointerEvents="none" />
 
       {/* Card Deck */}
       <View style={styles.deck}>
@@ -1025,5 +1464,87 @@ const styles = StyleSheet.create({
   },
   pulseEmoji: {
     fontSize: 48,
+  },
+
+  // Thought Bubble Notification Styles
+  notifBubbleContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 8 : 12,
+    right: 16,
+    zIndex: 999,
+    alignItems: 'flex-end',
+  },
+  notifBubbleMain: {
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 10,
+    borderWidth: 1.5,
+    width: SCREEN_W - 32,
+    position: 'relative',
+  },
+  notifBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  notifBubbleEmoji: {
+    fontSize: 18,
+  },
+  notifBubbleTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#1A1A2E',
+    flex: 1,
+  },
+  notifBubbleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    paddingRight: 20,
+  },
+  notifCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  notifCloseText: {
+    fontSize: 14,
+    color: '#9E9EB9',
+    fontWeight: '800',
+  },
+  notifDot1: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 26,
+    marginTop: -3,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  notifDot2: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    marginRight: 18,
+    marginTop: 3,
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });

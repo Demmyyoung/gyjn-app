@@ -2,6 +2,7 @@
   "expo": {
     "name": "Jinni",
     "slug": "jinni",
+    "scheme": "jinni",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -41,6 +42,9 @@
     "owner": "kodx-dev",
     "updates": {
       "url": "https://u.expo.dev/5d4538d6-df3f-4366-a08c-fcc61d7da767"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

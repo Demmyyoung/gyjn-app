@@ -2,6 +2,7 @@ import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { supabase } from '../lib/supabase';
 
 const C = {
   orange:  '#FF6B2C',
@@ -57,6 +58,17 @@ export default function OnboardingScreen({ navigation }) {
             <Text style={styles.cardArrow}>➔</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.signOutBtn}
+          onPress={async () => {
+            await supabase.auth.signOut();
+            navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.signOutText}>← Sign Out / Switch Account</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     </View>
   );
@@ -116,4 +128,14 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 16, fontWeight: '800', color: C.night },
   cardDesc: { fontSize: 12, color: C.muted, lineHeight: 16 },
   cardArrow: { fontSize: 18, color: C.orange, fontWeight: '700', paddingLeft: 8 },
+  signOutBtn: {
+    marginTop: 24,
+    paddingVertical: 12,
+    alignSelf: 'center',
+  },
+  signOutText: {
+    color: C.orange,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

@@ -11,6 +11,7 @@ import Animated, {
   runOnJS, interpolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 
 const C = {
@@ -218,19 +219,43 @@ export default function MatchesScreen({ route, navigation }) {
   const { data: matches = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ['matches', userName],
     queryFn:  async () => {
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data: dbProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      let query = supabase
         .from('matches')
         .select(`
           *,
           jobs(role, company, emoji, job_type, salary),
           messages(text, sender_type, created_at)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      if (dbProfile) {
+        if (dbProfile.user_type !== 'employer') {
+          query = query.eq('candidate_name', dbProfile.user_name || userName || 'Professional');
+        }
+      } else {
+        query = query.eq('candidate_name', userName || 'Professional');
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       return data ?? [];
     },
     staleTime: 30_000, // 30 s — cached between tab switches
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   // Realtime matches & messages cache invalidation listener
   // Updates pipeline status and message unread dots on screen dynamically

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -20,8 +21,37 @@ export default function SplashScreen({ navigation }) {
       useNativeDriver: false,
     }).start();
 
-    const timer = setTimeout(() => {
-      navigation.replace('Onboarding');
+    const timer = setTimeout(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (data && data.user_name) {
+            navigation.replace('Main', {
+              userName:    data.user_name,
+              userRole:    data.user_role,
+              jobType:     data.job_type,
+              aboutMe:     data.about_me,
+              searchTarget: data.search_target,
+              userType:    data.user_type,
+              skills:      data.skills || [],
+              cvUrl:       data.cv_url,
+              category:    data.category,
+            });
+          } else {
+            navigation.replace('Onboarding');
+          }
+        } else {
+          navigation.replace('Auth');
+        }
+      } catch (err) {
+        navigation.replace('Auth');
+      }
     }, 2400);
 
     return () => clearTimeout(timer);

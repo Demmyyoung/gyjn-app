@@ -11,6 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
@@ -141,8 +143,81 @@ export default function ProfileScreen({ route, navigation }) {
   const [cvUploading, setCvUploading] = useState(false);
   const [aiParsing, setAiParsing]     = useState(false);
   const [skillInput, setSkillInput]   = useState('');
+  const [userEmail, setUserEmail]     = useState('');
+
+  // Live stats states
+  const [localSwipes, setLocalSwipes] = useState(0);
+  const [localMatches, setLocalMatches] = useState(0);
 
   const pulseOpacity = useSharedValue(1);
+
+  const loadProfileAndStats = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || '');
+        
+        // 1. Fetch live profile data from Supabase
+        const { data: dbProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        let activeName = userName;
+        if (dbProfile) {
+          activeName = dbProfile.user_name || userName;
+          setProfile({
+            name:     activeName,
+            role:     dbProfile.user_role || userRole,
+            about:    dbProfile.about_me || aboutMe,
+            jobType:  dbProfile.job_type || jobType,
+            skills:   dbProfile.skills || defaultSkills,
+            category: dbProfile.category || initialCategory,
+          });
+          setCvUrl(dbProfile.cv_url);
+          if (dbProfile.cv_url) {
+            const parts = dbProfile.cv_url.split('/');
+            const filenameWithTimestamp = parts[parts.length - 1];
+            const filename = filenameWithTimestamp.replace(/^\d+_/, '');
+            setCvName(decodeURIComponent(filename));
+          } else {
+            setCvName(null);
+          }
+        }
+
+        // 2. Fetch live stats
+        // Swipes count from local storage
+        const swipesVal = await AsyncStorage.getItem('seeker_swipes_count');
+        if (swipesVal) {
+          setLocalSwipes(parseInt(swipesVal));
+        }
+
+        // Applied count from matches table
+        if (isEmployer) {
+          const { count } = await supabase
+            .from('matches')
+            .select('*', { count: 'exact', head: true });
+          setLocalMatches(count || 0);
+        } else {
+          const { count } = await supabase
+            .from('matches')
+            .select('*', { count: 'exact', head: true })
+            .eq('candidate_name', activeName);
+          setLocalMatches(count || 0);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load live profile and stats:', err);
+    }
+  }, [userName, userRole, aboutMe, jobType, defaultSkills, initialCategory, isEmployer]);
+
+  // Load when screen focuses (tab changes, navigation back, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileAndStats();
+    }, [loadProfileAndStats])
+  );
 
   useEffect(() => {
     if (aiParsing) {
@@ -203,7 +278,32 @@ export default function ProfileScreen({ route, navigation }) {
     setDraft({ ...profile });
     setEditing(true);
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({
+            id:            user.id,
+            user_name:     draft.name,
+            user_role:     draft.role,
+            about_me:      draft.about,
+            skills:        draft.skills,
+            category:      draft.category,
+            job_type:      draft.jobType,
+            cv_url:        cvUrl,
+            user_type:     isEmployer ? 'employer' : 'seeker',
+          });
+        if (error) {
+          Alert.alert('Error updating profile', error.message);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Database save failed:', err);
+    }
+
     setProfile({ ...draft });
     // Sync profile back to parent Navigator route.params so Tab switches auto-reload properly
     navigation.getParent()?.setParams({
@@ -253,6 +353,15 @@ export default function ProfileScreen({ route, navigation }) {
       setCvName(file.name);
       setCvUploading(false);
 
+      // Sync CV to user profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('profiles')
+          .update({ cv_url: data.publicUrl })
+          .eq('id', user.id);
+      }
+
       // Trigger AI parsing in the background
       setAiParsing(true);
       try {
@@ -300,7 +409,17 @@ export default function ProfileScreen({ route, navigation }) {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive',
-        onPress: () => { setCvUrl(null); setCvName(null); },
+        onPress: async () => {
+          setCvUrl(null);
+          setCvName(null);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('profiles')
+              .update({ cv_url: null })
+              .eq('id', user.id);
+          }
+        },
       },
     ]);
   };
@@ -328,7 +447,10 @@ export default function ProfileScreen({ route, navigation }) {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Log Out', style: 'destructive',
-        onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] }),
+        onPress: async () => {
+          await supabase.auth.signOut();
+          navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
+        },
       },
     ]);
   };
@@ -361,8 +483,8 @@ export default function ProfileScreen({ route, navigation }) {
         {/* Statistical Grid - Premium, independent glassmorphic cards */}
         <View style={styles.statsCardsRow}>
           {[
-            { val: totalSwipes, lbl: 'Swipes', icon: '⚡', color: C.orange },
-            { val: matchCount,  lbl: isEmployer ? 'Applicants' : 'Applied', icon: '🧞‍♂️', color: '#7B4FE9' },
+            { val: localSwipes, lbl: 'Swipes', icon: '⚡', color: C.orange },
+            { val: localMatches,  lbl: isEmployer ? 'Applicants' : 'Applied', icon: '🧞‍♂️', color: '#7B4FE9' },
           ].map(({ val, lbl, icon, color }) => (
             <View key={lbl} style={styles.statCard}>
               <View style={[styles.statIconBox, { backgroundColor: `${color}12` }]}>
@@ -392,8 +514,9 @@ export default function ProfileScreen({ route, navigation }) {
 
         {/* Preferences */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>JOB PREFERENCES</Text>
+          <Text style={styles.sectionLabel}>ACCOUNT & PREFERENCES</Text>
           {[
+            { label: 'Email',        val: userEmail || 'Loading...' },
             { label: 'Looking for',  val: profile.jobType },
             ...(isEmployer ? [] : [{ label: 'Category', val: profile.category }]),
             { label: 'Availability', val: 'Immediate' },
