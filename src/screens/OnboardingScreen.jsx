@@ -27,7 +27,7 @@ export default function OnboardingScreen({ navigation }) {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('Login', { role: 'seeker' })}
+            onPress={() => navigation.navigate('Auth', { role: 'seeker' })}
           >
             <View style={styles.cardLeft}>
               <View style={[styles.emojiBox, { backgroundColor: 'rgba(255, 107, 44, 0.08)' }]}>
@@ -44,7 +44,7 @@ export default function OnboardingScreen({ navigation }) {
           <TouchableOpacity
             style={styles.card}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('Login', { role: 'employer' })}
+            onPress={() => navigation.navigate('Auth', { role: 'employer' })}
           >
             <View style={styles.cardLeft}>
               <View style={[styles.emojiBox, { backgroundColor: 'rgba(123, 79, 233, 0.08)' }]}>
@@ -59,16 +59,6 @@ export default function OnboardingScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={async () => {
-            await supabase.auth.signOut();
-            navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.signOutText}>← Sign Out / Switch Account</Text>
-        </TouchableOpacity>
       </SafeAreaView>
     </View>
   );
@@ -128,14 +118,4 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 16, fontWeight: '800', color: C.night },
   cardDesc: { fontSize: 12, color: C.muted, lineHeight: 16 },
   cardArrow: { fontSize: 18, color: C.orange, fontWeight: '700', paddingLeft: 8 },
-  signOutBtn: {
-    marginTop: 24,
-    paddingVertical: 12,
-    alignSelf: 'center',
-  },
-  signOutText: {
-    color: C.orange,
-    fontSize: 14,
-    fontWeight: '700',
-  },
 });

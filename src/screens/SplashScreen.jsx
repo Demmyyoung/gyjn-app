@@ -61,10 +61,10 @@ export default function SplashScreen({ navigation }) {
             navigation.replace('Onboarding');
           }
         } else {
-          navigation.replace('Auth');
+          navigation.replace('Onboarding');
         }
       } catch (err) {
-        navigation.replace('Auth');
+        navigation.replace('Onboarding');
       }
     }, 2400);
 

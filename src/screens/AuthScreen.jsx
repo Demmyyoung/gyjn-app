@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -20,9 +21,10 @@ const C = {
   hint:    '#BEBEBE',
 };
 
-export default function AuthScreen({ navigation }) {
+export default function AuthScreen({ navigation, route }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -56,54 +58,73 @@ export default function AuthScreen({ navigation }) {
   const handleAuthSuccess = async (user) => {
     try {
       // Check employer profile first
-      let { data, error } = await supabase
+      let { data: empData } = await supabase
         .from('employer_profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      let userType = 'employer';
-
-      if (!data) {
-        // Fallback to seeker profile
-        const seekerRes = await supabase
-          .from('seeker_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        data = seekerRes.data;
-        userType = 'seeker';
-      }
-
-      if (data && data.user_name) {
+      if (empData && empData.user_name) {
         navigation.reset({
           index: 0,
           routes: [{
             name: 'Main',
             params: {
-              userName:    data.user_name,
-              userRole:    data.user_role || data.job_type, // role mapping might vary slightly
-              jobType:     data.job_type,
-              aboutMe:     data.about_me,
-              searchTarget: data.search_target,
-              userType:    userType,
-              skills:      data.skills || [],
-              cvUrl:       data.cv_url,
-              category:    data.category,
+              userName:    empData.user_name,
+              userRole:    empData.user_role || empData.job_type,
+              jobType:     empData.job_type,
+              aboutMe:     empData.about_me,
+              searchTarget: empData.search_target,
+              userType:    'employer',
+              skills:      empData.skills || [],
+              cvUrl:       empData.cv_url,
+              category:    empData.category,
             }
           }],
         });
-      } else {
+        return;
+      }
+
+      // Check seeker profile
+      let { data: seekerData } = await supabase
+        .from('seeker_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (seekerData && seekerData.user_name) {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Onboarding' }],
+          routes: [{
+            name: 'Main',
+            params: {
+              userName:    seekerData.user_name,
+              userRole:    seekerData.user_role || seekerData.job_type,
+              jobType:     seekerData.job_type,
+              aboutMe:     seekerData.about_me,
+              searchTarget: seekerData.search_target,
+              userType:    'seeker',
+              skills:      seekerData.skills || [],
+              cvUrl:       seekerData.cv_url,
+              category:    seekerData.category,
+            }
+          }],
         });
+        return;
       }
-    } catch (err) {
-      // If error (e.g. profile doesn't exist), route to Onboarding
+
+      // No completed profile found. Route to forms (LoginScreen)
+      // Pass the role they selected during onboarding so LoginScreen knows what forms to show.
+      const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Onboarding' }],
+        routes: [{ name: 'Login', params: { role: currentRole } }],
+      });
+    } catch (err) {
+      const currentRole = route?.params?.role || 'seeker';
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login', params: { role: currentRole } }],
       });
     }
   };
@@ -134,9 +155,39 @@ export default function AuthScreen({ navigation }) {
     };
   }, []);
 
+  const handleForgotPassword = async () => {
+    const emailRegex = /.+@.+\..+/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) {
+        Alert.alert('Reset Password Error', error.message);
+      } else {
+        Alert.alert('Password Reset', 'If this email is registered, you will receive a reset link shortly.');
+      }
+    } catch (err) {
+      Alert.alert('Reset Password Error', err.message);
+    }
+  };
+
   const handleEmailAuth = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Required Fields', 'Please enter both email and password.');
+      return;
+    }
+
+    const emailRegex = /.+@.+\..+/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
       return;
     }
 
@@ -220,7 +271,9 @@ export default function AuthScreen({ navigation }) {
           {/* Form */}
           <View style={styles.form}>
             <Text style={styles.formTitle}>
-              {isSignUp ? 'Create your account' : 'Welcome back'}
+              {isSignUp 
+                ? `Create ${route?.params?.role === 'employer' ? 'Employer ' : ''}account` 
+                : 'Welcome back'}
             </Text>
 
             <View style={styles.group}>
@@ -240,17 +293,28 @@ export default function AuthScreen({ navigation }) {
 
             <View style={styles.group}>
               <Text style={styles.label}>PASSWORD</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor={C.hint}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-                autoComplete="password"
-                autoCorrect={false}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  placeholder="••••••••"
+                  placeholderTextColor={C.hint}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={C.hint} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Email Button */}
@@ -332,6 +396,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.02,
     shadowRadius: 4,
     elevation: 1,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1A1A1A',
+  },
+  eyeIconContainer: {
+    padding: 14,
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  forgotPasswordText: {
+    color: C.orange,
+    fontSize: 13,
+    fontWeight: '600',
   },
   cta: {
     borderRadius: 16,
