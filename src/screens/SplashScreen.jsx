@@ -25,20 +25,34 @@ export default function SplashScreen({ navigation }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          const { data } = await supabase
-            .from('profiles')
+          // Check employer profiles
+          let { data } = await supabase
+            .from('employer_profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
           
+          let userType = 'employer';
+
+          if (!data) {
+            // Check seeker profiles
+            const seekerRes = await supabase
+              .from('seeker_profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            data = seekerRes.data;
+            userType = 'seeker';
+          }
+          
           if (data && data.user_name) {
             navigation.replace('Main', {
               userName:    data.user_name,
-              userRole:    data.user_role,
+              userRole:    data.user_role || data.job_type,
               jobType:     data.job_type,
               aboutMe:     data.about_me,
               searchTarget: data.search_target,
-              userType:    data.user_type,
+              userType:    userType,
               skills:      data.skills || [],
               cvUrl:       data.cv_url,
               category:    data.category,

@@ -158,8 +158,9 @@ export default function ProfileScreen({ route, navigation }) {
         setUserEmail(user.email || '');
         
         // 1. Fetch live profile data from Supabase
+        const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
         const { data: dbProfile } = await supabase
-          .from('profiles')
+          .from(tableName)
           .select('*')
           .eq('id', user.id)
           .single();
@@ -282,8 +283,9 @@ export default function ProfileScreen({ route, navigation }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
         const { error } = await supabase
-          .from('profiles')
+          .from(tableName)
           .upsert({
             id:            user.id,
             user_name:     draft.name,
@@ -293,7 +295,6 @@ export default function ProfileScreen({ route, navigation }) {
             category:      draft.category,
             job_type:      draft.jobType,
             cv_url:        cvUrl,
-            user_type:     isEmployer ? 'employer' : 'seeker',
           });
         if (error) {
           Alert.alert('Error updating profile', error.message);
@@ -356,8 +357,9 @@ export default function ProfileScreen({ route, navigation }) {
       // Sync CV to user profile
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
         await supabase
-          .from('profiles')
+          .from(tableName)
           .update({ cv_url: data.publicUrl })
           .eq('id', user.id);
       }
@@ -413,9 +415,10 @@ export default function ProfileScreen({ route, navigation }) {
           setCvUrl(null);
           setCvName(null);
           const { data: { user } } = await supabase.auth.getUser();
+          const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
           if (user) {
             await supabase
-              .from('profiles')
+              .from(tableName)
               .update({ cv_url: null })
               .eq('id', user.id);
           }

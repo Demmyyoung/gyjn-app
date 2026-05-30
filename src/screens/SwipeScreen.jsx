@@ -360,8 +360,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          const tableName = userType === 'employer' ? 'employer_profiles' : 'seeker_profiles';
           const { data } = await supabase
-            .from('profiles')
+            .from(tableName)
             .select('*')
             .eq('id', user.id)
             .single();
@@ -818,8 +819,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           const { data: { user } } = await supabase.auth.getUser();
           let activeProfile = {};
           if (user) {
+            const tableName = userType === 'employer' ? 'employer_profiles' : 'seeker_profiles';
             const { data } = await supabase
-              .from('profiles')
+              .from(tableName)
               .select('*')
               .eq('id', user.id)
               .single();

@@ -241,14 +241,14 @@ export default function LoginScreen({ navigation, route }) {
         job_type:      jobType,
         about_me:      aboutMe,
         search_target: searchTarget,
-        user_type:     isEmployer ? 'employer' : 'seeker',
         skills:        selectedSkills.length > 0 ? selectedSkills : ['JavaScript', 'React', 'Figma'],
         cv_url:        cvUrl ?? null,
         category:      isEmployer ? null : category,
       };
 
+      const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
       const { error } = await supabase
-        .from('profiles')
+        .from(tableName)
         .upsert(profile);
 
       if (error) {
@@ -260,7 +260,7 @@ export default function LoginScreen({ navigation, route }) {
         index: 0,
         routes: [{
           name: 'Main',
-          params: profile
+          params: { ...profile, userType: isEmployer ? 'employer' : 'seeker' }
         }],
       });
     } catch (err) {

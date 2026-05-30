@@ -222,8 +222,9 @@ export default function MatchesScreen({ route, navigation }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
+      const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
       const { data: dbProfile } = await supabase
-        .from('profiles')
+        .from(tableName)
         .select('*')
         .eq('id', user.id)
         .single();
@@ -237,7 +238,7 @@ export default function MatchesScreen({ route, navigation }) {
         `);
 
       if (dbProfile) {
-        if (dbProfile.user_type !== 'employer') {
+        if (!isEmployer) {
           query = query.eq('candidate_name', dbProfile.user_name || userName || 'Professional');
         }
       } else {
