@@ -312,14 +312,14 @@ export default function LoginScreen({ navigation, route }) {
               activeOpacity={0.8}
             >
               <LinearGradient 
-                colors={['#FFF9F5', '#FFEADB']} 
+                colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.6)']} 
                 style={StyleSheet.absoluteFillObject}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               />
               <View style={styles.magicBannerInner}>
                 <View style={styles.magicIconBox}>
-                  <Text style={styles.magicIcon}>✨</Text>
+                  <Text style={styles.magicIcon}>📄✨</Text>
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.magicTitle}>Magic CV Auto-Fill</Text>
@@ -332,8 +332,13 @@ export default function LoginScreen({ navigation, route }) {
                       ? `CV Loaded: ${cvName}`
                       : "Upload your CV to instantly populate your profile details."}
                   </Text>
+                  {(cvUploading || aiParsing) && (
+                    <Animated.View style={[styles.loadingBar, animatedPulseStyle]} />
+                  )}
                 </View>
-                <Text style={styles.magicArrow}>➔</Text>
+                <LinearGradient colors={[C.orange, C.mango]} style={styles.magicArrowBox} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <Text style={styles.magicArrow}>➔</Text>
+                </LinearGradient>
               </View>
             </TouchableOpacity>
           )}
@@ -403,17 +408,29 @@ export default function LoginScreen({ navigation, route }) {
             <View style={styles.group}>
               <Text style={styles.label}>I'M LOOKING FOR</Text>
               <View style={styles.pillRow}>
-                {jobTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.typePill, jobType === type && styles.typePillActive]}
-                    onPress={() => setJobType(type)}
-                  >
-                    <Text style={[styles.typePillText, jobType === type && styles.typePillTextActive]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {jobTypes.map((type) => {
+                  const isActive = jobType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={isActive ? styles.typePillActiveContainer : styles.typePill}
+                      onPress={() => setJobType(type)}
+                      activeOpacity={0.8}
+                    >
+                      {isActive ? (
+                        <LinearGradient colors={[C.orange, C.mango]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.typePillActive}>
+                          <Text style={[styles.typePillText, styles.typePillTextActive]}>
+                            {type}
+                          </Text>
+                        </LinearGradient>
+                      ) : (
+                        <Text style={styles.typePillText}>
+                          {type}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -589,19 +606,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  textArea: { height: 100, textAlignVertical: 'top', paddingTop: 14 },
+  textArea: { height: 110, textAlignVertical: 'top', paddingTop: 16, paddingHorizontal: 20, borderColor: 'rgba(0,0,0,0.08)' },
 
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   typePill: {
-    paddingHorizontal: 16, paddingVertical: 9,
-    borderRadius: 40, borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.08)',
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderRadius: 40, borderWidth: 1,
+    borderColor: '#E2E2E2',
     backgroundColor: '#fff',
   },
-  typePillActive: { backgroundColor: C.orange, borderColor: C.orange },
-  typePillText: { fontSize: 13, fontWeight: '600', color: C.muted },
-  typePillTextActive: { color: '#fff' },
+  typePillActiveContainer: {
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  typePillActive: { 
+    paddingHorizontal: 19, paddingVertical: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  typePillText: { fontSize: 13, fontWeight: '600', color: '#7A7A7A' },
+  typePillTextActive: { color: '#fff', fontWeight: '800' },
 
   // Skills
   skillsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -737,19 +761,19 @@ const styles = StyleSheet.create({
   magicBanner: {
     borderRadius: 20,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,107,44,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     marginVertical: 4,
-    shadowColor: C.orange,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
-    backgroundColor: '#FFEADB', // Solid premium peach fallback background
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   magicBannerInner: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
@@ -768,7 +792,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   magicIcon: {
-    fontSize: 20,
+    fontSize: 22,
   },
   magicTitle: {
     fontSize: 15,
@@ -776,13 +800,33 @@ const styles = StyleSheet.create({
     color: C.night,
   },
   magicDesc: {
-    fontSize: 12,
-    color: C.muted,
-    lineHeight: 16,
+    fontSize: 13,
+    color: '#333333',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  loadingBar: {
+    height: 3,
+    backgroundColor: C.orange,
+    borderRadius: 2,
+    marginTop: 4,
+    width: '40%',
+  },
+  magicArrowBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   magicArrow: {
     fontSize: 16,
-    color: C.orange,
-    fontWeight: '700',
+    color: '#fff',
+    fontWeight: '800',
   },
 });
