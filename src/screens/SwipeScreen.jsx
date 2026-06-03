@@ -326,6 +326,52 @@ function LoadingPulse() {
   );
 }
 
+function calculateMatchScore(candidate, job) {
+  let score = 0;
+
+  // 1. Category Match (50 points)
+  if (candidate.category && job.category) {
+    if (candidate.category.toLowerCase() === job.category.toLowerCase()) {
+      score += 50;
+    }
+  }
+
+  // 2. Skills Overlap (up to 35 points)
+  if (candidate.skills && candidate.skills.length > 0) {
+    const jobText = [
+      ...(job.tags || []).map(t => t.label),
+      ...(job.reqs || []),
+      job.category || ''
+    ].join(' ').toLowerCase();
+
+    const matched = candidate.skills.filter(skill => {
+      const cleanSkill = skill.toLowerCase().trim();
+      if (!cleanSkill) return false;
+      const escaped = cleanSkill.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp('(?:^|[^a-zA-Z0-9_#+])' + escaped + '(?:$|[^a-zA-Z0-9_#+])', 'i');
+      return regex.test(jobText);
+    }).length;
+
+    const total = candidate.skills.length;
+    const skillScore = Math.round((matched / total) * 35);
+    score += skillScore;
+  }
+
+  // 3. Job Type Match (15 points)
+  if (candidate.jobType && job.job_type) {
+    const candidatePref = candidate.jobType.toLowerCase();
+    const jobType = job.job_type.toLowerCase();
+
+    if (candidatePref === jobType) {
+      score += 15;
+    } else if (candidatePref === 'hybrid' || jobType === 'hybrid') {
+      score += 8;
+    }
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
@@ -398,7 +444,18 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           .eq('status', 'Open')
           .order('created_at', { ascending: false });
         if (error) throw new Error(error.message);
-        return data ?? [];
+        
+        // Calculate scores locally
+        const localScoredJobs = (data ?? []).map(job => ({
+          ...job,
+          match: calculateMatchScore({
+            category: activeProfile.category || route.params?.category,
+            skills: activeProfile.skills || route.params?.skills || [],
+            jobType: activeProfile.job_type || route.params?.jobType
+          }, job)
+        })).sort((a, b) => b.match - a.match);
+
+        return localScoredJobs;
       }
     },
     staleTime: 5 * 60 * 1000,
