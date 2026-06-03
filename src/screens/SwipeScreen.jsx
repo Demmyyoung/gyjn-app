@@ -329,6 +329,7 @@ function LoadingPulse() {
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
+  const userType = route.params?.userType || 'seeker';
   const insets = useSafeAreaInsets();
   const [jobs, setJobs] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
