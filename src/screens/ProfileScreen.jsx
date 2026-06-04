@@ -452,7 +452,7 @@ export default function ProfileScreen({ route, navigation }) {
         text: 'Log Out', style: 'destructive',
         onPress: async () => {
           await supabase.auth.signOut();
-          navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
+          navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
         },
       },
     ]);
