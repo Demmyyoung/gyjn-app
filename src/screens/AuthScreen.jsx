@@ -29,29 +29,44 @@ export default function AuthScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Parse deep link url and set session
+  // Extract the auth code from the redirect URL and exchange it for a session.
+  // Supabase stores the PKCE code_verifier internally when signInWithOAuth is called,
+  // so we just need to pass the raw code back and it handles the rest.
   const parseAndSetSession = async (url) => {
+    console.log('Parsing redirect URL:', url);
     try {
-      const hash = url.split('#')[1];
-      if (!hash) return;
-      
-      const params = {};
-      hash.split('&').forEach(part => {
-        const [key, value] = part.split('=');
-        if (key && value) {
-          params[key] = decodeURIComponent(value);
+      // Try code (PKCE flow) - this is what Supabase uses by default
+      const codeMatch = url.match(/[?&]code=([^&]+)/);
+      if (codeMatch) {
+        const code = decodeURIComponent(codeMatch[1]);
+        console.log('Found auth code, exchanging for session...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('exchangeCodeForSession error:', error.message);
+          // Fallback: manually refresh session in case verifier state was lost
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session?.user) {
+            console.log('Session recovered from storage!');
+          }
+        } else {
+          console.log('PKCE session set successfully for:', data?.user?.email);
         }
-      });
+        return;
+      }
 
-      if (params.access_token && params.refresh_token) {
+      // Fallback: implicit flow (access_token in hash)
+      const hashMatch = url.match(/#access_token=([^&]+).*&refresh_token=([^&]+)/);
+      if (hashMatch) {
+        console.log('Setting implicit session...');
         const { error } = await supabase.auth.setSession({
-          access_token: params.access_token,
-          refresh_token: params.refresh_token,
+          access_token: decodeURIComponent(hashMatch[1]),
+          refresh_token: decodeURIComponent(hashMatch[2]),
         });
         if (error) throw error;
+        console.log('Implicit session set successfully!');
       }
     } catch (err) {
-      console.error('Failed to parse redirected session:', err);
+      console.error('Failed to parse redirected session:', err.message);
     }
   };
 
@@ -133,7 +148,8 @@ export default function AuthScreen({ navigation, route }) {
   useEffect(() => {
     const handleDeepLink = (event) => {
       const url = event.url;
-      if (url && url.includes('jinni://')) {
+      console.log('Intercepted deep link event URL:', url);
+      if (url && (url.includes('jinni://') || url.includes('google-auth') || url.includes('--/google-auth'))) {
         parseAndSetSession(url);
       }
     };
@@ -223,11 +239,9 @@ export default function AuthScreen({ navigation, route }) {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const redirectUrl = Linking.createURL('google-auth', { scheme: 'jinni' });
-      console.log('--- GOOGLE SIGN-IN DEEP LINK REDIRECT URL ---');
-      console.log('Copy and add this URL to your Supabase Dashboard -> Authentication -> Redirect URLs:');
-      console.log(redirectUrl);
-      console.log('---------------------------------------------');
+      // Always use the custom scheme so the app can catch the redirect
+      const redirectUrl = 'jinni://google-auth';
+      console.log('[GoogleAuth] Using redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -239,13 +253,24 @@ export default function AuthScreen({ navigation, route }) {
 
       if (error) throw error;
 
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        if (result.type === 'success' && result.url) {
-          await parseAndSetSession(result.url);
-        }
+      if (!data?.url) {
+        throw new Error('No OAuth URL returned from Supabase');
+      }
+
+      console.log('[GoogleAuth] Opening browser...');
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      console.log('[GoogleAuth] Browser result type:', result.type);
+
+      if (result.type === 'success' && result.url) {
+        console.log('[GoogleAuth] Got redirect back:', result.url.substring(0, 80) + '...');
+        await parseAndSetSession(result.url);
+      } else if (result.type === 'cancel') {
+        console.log('[GoogleAuth] User cancelled sign-in');
+      } else {
+        console.log('[GoogleAuth] Unexpected result:', result.type);
       }
     } catch (err) {
+      console.error('[GoogleAuth] Error:', err.message);
       Alert.alert('Google Sign-In Failed', err.message || JSON.stringify(err));
     } finally {
       setGoogleLoading(false);
