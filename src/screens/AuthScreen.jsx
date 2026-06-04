@@ -224,6 +224,11 @@ export default function AuthScreen({ navigation, route }) {
     setGoogleLoading(true);
     try {
       const redirectUrl = Linking.createURL('google-auth', { scheme: 'jinni' });
+      console.log('--- GOOGLE SIGN-IN DEEP LINK REDIRECT URL ---');
+      console.log('Copy and add this URL to your Supabase Dashboard -> Authentication -> Redirect URLs:');
+      console.log(redirectUrl);
+      console.log('---------------------------------------------');
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
