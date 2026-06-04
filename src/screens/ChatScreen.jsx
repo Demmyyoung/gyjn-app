@@ -69,7 +69,8 @@ function TypingDots() {
 }
 
 export default function ChatScreen({ route, navigation }) {
-  const { match, userName, userType } = route.params || {};
+  const { match, userName, userType: rawUserType } = route.params || {};
+  const userType = rawUserType === 'candidate' ? 'seeker' : rawUserType;
   const isEmployer = userType === 'employer';
   const matchId = match?.match_id;
 
@@ -147,7 +148,7 @@ export default function ChatScreen({ route, navigation }) {
           if (prev.some((msg) => msg.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
-        if (payload.new.sender_type !== userType) setRemoteIsTyping(false);
+        if (payload.new.sender_type !== userType && !(userType === 'seeker' && payload.new.sender_type === 'candidate')) setRemoteIsTyping(false);
       })
       .on('postgres_changes', {
         event: 'DELETE', schema: 'public', table: 'messages',
@@ -157,7 +158,8 @@ export default function ChatScreen({ route, navigation }) {
         setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
-        if (payload?.sender !== userType) {
+        const isRemote = payload?.sender !== userType && !(userType === 'seeker' && payload?.sender === 'candidate');
+        if (isRemote) {
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setRemoteIsTyping(true);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -356,7 +358,7 @@ export default function ChatScreen({ route, navigation }) {
       );
     }
 
-    const isMine = item.sender_type === userType;
+    const isMine = item.sender_type === userType || (userType === 'seeker' && item.sender_type === 'candidate');
     const repliedMsg = item.reply_to ? msgMap[item.reply_to] : null;
 
     const bubble = (
@@ -378,7 +380,7 @@ export default function ChatScreen({ route, navigation }) {
               isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs,
             ]}>
               <Text style={[styles.replyQuoteSender, isMine && { color: 'rgba(255,255,255,0.8)' }]}>
-                {repliedMsg.sender_type === userType ? 'You' : recipientName}
+                {repliedMsg.sender_type === userType || (userType === 'seeker' && repliedMsg.sender_type === 'candidate') ? 'You' : recipientName}
               </Text>
               <Text
                 style={[styles.replyQuoteText, isMine && { color: 'rgba(255,255,255,0.7)' }]}
@@ -505,7 +507,7 @@ export default function ChatScreen({ route, navigation }) {
           <View style={styles.replyBarAccent} />
           <View style={styles.replyBarContent}>
             <Text style={styles.replyBarSender}>
-              Replying to {replyTo.sender_type === userType ? 'yourself' : recipientName}
+               Replying to {replyTo.sender_type === userType || (userType === 'seeker' && replyTo.sender_type === 'candidate') ? 'yourself' : recipientName}
             </Text>
             <Text style={styles.replyBarText} numberOfLines={1}>
               {replyTo.text}
@@ -589,7 +591,7 @@ export default function ChatScreen({ route, navigation }) {
             </TouchableOpacity>
 
             {/* Delete — only for own messages */}
-            {menuMsg?.sender_type === userType && (
+             {((menuMsg?.sender_type === userType) || (userType === 'seeker' && menuMsg?.sender_type === 'candidate')) && (
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.7}

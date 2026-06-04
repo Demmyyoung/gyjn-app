@@ -34,11 +34,11 @@ function MatchCard({ item, isNew, onPress, userType }) {
   const canChat = item.status === 'Interviewing' || item.status === 'Hired';
 
   // Calculate unread badge state
-  const otherSenderType = userType === 'employer' ? 'candidate' : 'employer';
+  const otherSenderType = userType === 'employer' ? 'seeker' : 'employer';
   const msgs = item.messages ?? [];
   const sortedMsgs = [...msgs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const lastMsg = sortedMsgs[sortedMsgs.length - 1];
-  const hasUnread = lastMsg && lastMsg.sender_type === otherSenderType;
+  const hasUnread = lastMsg && (lastMsg.sender_type === otherSenderType || (otherSenderType === 'seeker' && lastMsg.sender_type === 'candidate'));
 
   return (
     <TouchableOpacity

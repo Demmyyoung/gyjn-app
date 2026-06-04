@@ -574,7 +574,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       navigation.navigate('Chat', { 
         match: matchData, 
         userName: route.params?.userName, 
-        userType: 'candidate' 
+        userType: 'seeker' 
       });
     }
   };
