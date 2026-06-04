@@ -29,44 +29,42 @@ export default function AuthScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Extract the auth code from the redirect URL and exchange it for a session.
-  // Supabase stores the PKCE code_verifier internally when signInWithOAuth is called,
-  // so we just need to pass the raw code back and it handles the rest.
+  // With implicit flow, Supabase returns tokens directly in the URL hash.
+  // e.g. jinni://google-auth#access_token=...&refresh_token=...
   const parseAndSetSession = async (url) => {
-    console.log('Parsing redirect URL:', url);
+    console.log('[Auth] Parsing redirect URL:', url.substring(0, 100));
     try {
-      // Try code (PKCE flow) - this is what Supabase uses by default
-      const codeMatch = url.match(/[?&]code=([^&]+)/);
-      if (codeMatch) {
-        const code = decodeURIComponent(codeMatch[1]);
-        console.log('Found auth code, exchanging for session...');
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error('exchangeCodeForSession error:', error.message);
-          // Fallback: manually refresh session in case verifier state was lost
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session?.user) {
-            console.log('Session recovered from storage!');
-          }
-        } else {
-          console.log('PKCE session set successfully for:', data?.user?.email);
+      // Implicit flow: tokens in hash fragment
+      const hashMatch = url.match(/#access_token=([^&]+).*?refresh_token=([^&]+)/);
+      if (hashMatch) {
+        const access_token = decodeURIComponent(hashMatch[1]);
+        const refresh_token = decodeURIComponent(hashMatch[2]);
+        console.log('[Auth] Found tokens in hash, setting session...');
+        const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
+        console.log('[Auth] Session set for:', data?.user?.email);
+        if (data?.user) {
+          await handleAuthSuccess(data.user);
         }
         return;
       }
 
-      // Fallback: implicit flow (access_token in hash)
-      const hashMatch = url.match(/#access_token=([^&]+).*&refresh_token=([^&]+)/);
-      if (hashMatch) {
-        console.log('Setting implicit session...');
-        const { error } = await supabase.auth.setSession({
-          access_token: decodeURIComponent(hashMatch[1]),
-          refresh_token: decodeURIComponent(hashMatch[2]),
-        });
+      // Query param fallback (PKCE - should not occur with implicit flow but just in case)
+      const codeMatch = url.match(/[?&]code=([^&]+)/);
+      if (codeMatch) {
+        console.log('[Auth] Found auth code (PKCE fallback), trying exchange...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(
+          decodeURIComponent(codeMatch[1])
+        );
         if (error) throw error;
-        console.log('Implicit session set successfully!');
+        if (data?.user) await handleAuthSuccess(data.user);
+        return;
       }
+
+      console.log('[Auth] No tokens or code found in redirect URL:', url.substring(0, 150));
     } catch (err) {
-      console.error('Failed to parse redirected session:', err.message);
+      console.error('[Auth] Failed to parse redirect:', err.message);
+      Alert.alert('Sign-In Error', 'Could not complete Google sign-in. Please try again.');
     }
   };
 
@@ -238,11 +236,9 @@ export default function AuthScreen({ navigation, route }) {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    try {
-      // Always use the custom scheme so the app can catch the redirect
-      const redirectUrl = 'jinni://google-auth';
-      console.log('[GoogleAuth] Using redirect URL:', redirectUrl);
+    const redirectUrl = 'jinni://google-auth';
 
+    try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -252,22 +248,48 @@ export default function AuthScreen({ navigation, route }) {
       });
 
       if (error) throw error;
+      if (!data?.url) throw new Error('No OAuth URL returned from Supabase');
 
-      if (!data?.url) {
-        throw new Error('No OAuth URL returned from Supabase');
-      }
+      console.log('[GoogleAuth] Opening browser for OAuth...');
 
-      console.log('[GoogleAuth] Opening browser...');
+      // Track whether we've already handled the redirect to avoid double-processing
+      let resolved = false;
+
+      // PRIMARY handler for Android: when Android brings the app to the
+      // foreground via a jinni:// deep link, Linking fires this event.
+      // This fires even while openAuthSessionAsync is still awaiting.
+      const linkSub = Linking.addEventListener('url', async ({ url }) => {
+        if (url && url.startsWith('jinni://google-auth') && !resolved) {
+          resolved = true;
+          linkSub.remove();
+          console.log('[GoogleAuth] Deep link caught via Linking:', url.substring(0, 80));
+          WebBrowser.dismissBrowser(); // Close the stuck browser on Android
+          await parseAndSetSession(url);
+        }
+      });
+
+      // openAuthSessionAsync handles iOS (SFSafariViewController closes automatically)
+      // and Android when the native RedirectActivity IS compiled in.
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      linkSub.remove(); // Clean up listener when browser closes for any reason
+
       console.log('[GoogleAuth] Browser result type:', result.type);
 
-      if (result.type === 'success' && result.url) {
-        console.log('[GoogleAuth] Got redirect back:', result.url.substring(0, 80) + '...');
-        await parseAndSetSession(result.url);
-      } else if (result.type === 'cancel') {
-        console.log('[GoogleAuth] User cancelled sign-in');
-      } else {
-        console.log('[GoogleAuth] Unexpected result:', result.type);
+      if (!resolved) {
+        if (result.type === 'success' && result.url) {
+          // iOS / properly configured Android: redirect URL captured natively
+          console.log('[GoogleAuth] Redirect captured by openAuthSessionAsync');
+          await parseAndSetSession(result.url);
+        } else {
+          // Last resort: maybe the session was set via onAuthStateChange already
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            console.log('[GoogleAuth] Session found in storage, routing...');
+            await handleAuthSuccess(session.user);
+          } else if (result.type !== 'cancel') {
+            console.log('[GoogleAuth] No session found. Result:', result.type);
+          }
+        }
       }
     } catch (err) {
       console.error('[GoogleAuth] Error:', err.message);
