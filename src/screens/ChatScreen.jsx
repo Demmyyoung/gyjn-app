@@ -78,6 +78,23 @@ export default function ChatScreen({ route, navigation }) {
   const flatListRef = useRef(null);
   const swipeableRefs = useRef({});
   const isInitialLayout = useRef(true);
+  const inputRef = useRef(null);
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+
+  const handleTouchStart = useCallback((e) => {
+    touchStartY.current = e.nativeEvent.pageY;
+    touchStartX.current = e.nativeEvent.pageX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    const deltaY = touchStartY.current - e.nativeEvent.pageY;
+    const deltaX = Math.abs(e.nativeEvent.pageX - touchStartX.current);
+    // Focus the input if swiped up by more than 20 pixels, and it's mostly a vertical motion
+    if (deltaY > 20 && deltaX < 50) {
+      inputRef.current?.focus();
+    }
+  }, []);
 
   // Core state
   const [messages, setMessages] = useState([]);
@@ -420,8 +437,8 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.select({ ios: 90, android: 0 })}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
     >
       <StatusBar barStyle="dark-content" />
 
@@ -524,7 +541,11 @@ export default function ChatScreen({ route, navigation }) {
       )}
 
       {/* Footer Input Bar */}
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}
+      >
         {isEmployer && (
           <TouchableOpacity
             style={styles.scheduleIconBtn}
@@ -539,6 +560,7 @@ export default function ChatScreen({ route, navigation }) {
         )}
 
         <TextInput
+          ref={inputRef}
           style={styles.textInput}
           placeholder={replyTo ? 'Type your reply...' : 'Type your message...'}
           placeholderTextColor={C.hint}

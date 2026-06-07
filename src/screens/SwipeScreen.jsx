@@ -62,6 +62,26 @@ const C = {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+function formatDisplaySalary(salary) {
+  if (!salary) return 'Competitive';
+  
+  let result = salary.trim();
+  if (!result.startsWith('₦')) {
+    result = `₦${result}`;
+  }
+  
+  const hasFrequency = result.includes('/') || 
+                       result.toLowerCase().includes('contract') || 
+                       result.toLowerCase().includes('mo') || 
+                       result.toLowerCase().includes('wk');
+  
+  if (!hasFrequency) {
+    result = `${result}/mo`;
+  }
+  
+  return result;
+}
+
 const getNotifStyle = (type) => {
   switch (type) {
     case 'Interviewing':
@@ -162,7 +182,7 @@ function JobCard({ job, onPress, isTop }) {
           </View>
 
           <View style={styles.cardBottomFooter}>
-            <Text style={styles.cardSalary}>{job.salary} / mo</Text>
+            <Text style={styles.cardSalary}>{formatDisplaySalary(job.salary)}</Text>
             <Text style={styles.tapPrompt}>Tap details ➔</Text>
           </View>
         </View>
@@ -1166,7 +1186,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
               </View>
               <Text style={styles.sheetSectionLabel}>SALARY</Text>
               <View style={styles.salaryCard}>
-                <Text style={styles.sheetSalary}>{detailJob?.salary} / mo</Text>
+                <Text style={styles.sheetSalary}>{formatDisplaySalary(detailJob?.salary)}</Text>
               </View>
               <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
               <Text style={styles.sheetDesc}>{detailJob?.description}</Text>

@@ -462,6 +462,7 @@ export default function ProfileScreen({ route, navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+        <View style={{ width: 40 }} />
         <Text style={styles.title}>Profile</Text>
         <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
           <Text style={styles.editIcon}>✎</Text>
@@ -810,7 +811,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 24, paddingBottom: 8,
   },
-  title: { fontSize: 28, fontWeight: '800', color: C.night },
+  title: { fontSize: 28, fontWeight: '800', color: C.night, textAlign: 'center', flex: 1 },
   editBtn: {
     width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
@@ -843,8 +844,8 @@ const styles = StyleSheet.create({
     borderColor: C.orange,
   },
   avatarInitials: { fontSize: 30, fontWeight: '900', color: '#fff' },
-  pName: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  pRole: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
+  pName: { fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'center' },
+  pRole: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600', textAlign: 'center' },
   pBio: { fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 4, paddingHorizontal: 10, lineHeight: 18 },
 
   // Stats cards

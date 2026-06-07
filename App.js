@@ -1,5 +1,6 @@
 import "react-native-gesture-handler";
 import React from "react";
+import { PostHogProvider } from "posthog-react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { NavigationContainer, useRoute } from "@react-navigation/native";
@@ -108,6 +109,10 @@ const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
+    <PostHogProvider
+      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
+      options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
+    >
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
@@ -135,5 +140,6 @@ export default function App() {
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
+    </PostHogProvider>
   );
 }

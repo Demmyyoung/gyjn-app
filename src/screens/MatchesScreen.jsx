@@ -8,7 +8,7 @@ import {
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
-  runOnJS, interpolate,
+  runOnJS, interpolate, withRepeat, withSequence,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -206,6 +206,56 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, navigation, userName, u
         />
       </Swipeable>
     </Animated.View>
+  );
+}
+
+function MatchCardSkeleton({ animatedStyle }) {
+  return (
+    <Animated.View style={[styles.card, animatedStyle]}>
+      {/* Logo Box Placeholder */}
+      <View style={[styles.logoBox, { backgroundColor: '#EBEBEB', borderColor: '#EBEBEB' }]} />
+
+      {/* Info Placeholder */}
+      <View style={styles.cardInfo}>
+        <View style={[styles.skeletonLine, { width: '65%', height: 16, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '45%', height: 12 }]} />
+      </View>
+
+      {/* Right Badge Placeholder */}
+      <View style={styles.cardRight}>
+        <View style={[styles.skeletonLine, { width: 65, height: 22, borderRadius: 11 }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+function MatchesSkeleton() {
+  const opacity = useSharedValue(0.4);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.8, { duration: 800 }),
+        withTiming(0.4, { duration: 800 })
+      ),
+      -1, // infinite loop
+      true // reverse sequence
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+    };
+  });
+
+  return (
+    <View style={styles.skeletonList}>
+      <MatchCardSkeleton animatedStyle={animatedStyle} />
+      <MatchCardSkeleton animatedStyle={animatedStyle} />
+      <MatchCardSkeleton animatedStyle={animatedStyle} />
+      <MatchCardSkeleton animatedStyle={animatedStyle} />
+    </View>
   );
 }
 
@@ -420,9 +470,7 @@ export default function MatchesScreen({ route, navigation }) {
       )}
 
       {isLoading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={C.orange} size="large" />
-        </View>
+        <MatchesSkeleton />
       ) : (
         <FlatList
           data={filteredMatches}
@@ -474,11 +522,20 @@ export default function MatchesScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.cream },
+  skeletonLine: {
+    backgroundColor: '#EBEBEB',
+    borderRadius: 4,
+  },
+  skeletonList: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 10,
+  },
 
   // Header
-  header:   { paddingHorizontal: 24, paddingBottom: 8 },
-  title:    { fontSize: 28, fontWeight: '800', color: C.night },
-  subtitle: { fontSize: 13, color: C.hint, marginTop: 2 },
+  header:   { paddingHorizontal: 24, paddingBottom: 8, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontSize: 28, fontWeight: '800', color: C.night, textAlign: 'center' },
+  subtitle: { fontSize: 13, color: C.hint, marginTop: 4, textAlign: 'center' },
   count:    { fontWeight: '700', color: C.orange },
 
   // Search Bar

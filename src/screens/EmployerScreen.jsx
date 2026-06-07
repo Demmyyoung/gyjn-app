@@ -260,21 +260,41 @@ export default function EmployerScreen({ route }) {
         "Excited to work in a fast-paced environment and take ownership"
       ];
 
+      let finalSalary = null;
+      if (formSalary.trim()) {
+        const cleaned = formSalary.replace(/[₦,]/g, '').trim();
+        const isNumeric = /^\d+$/.test(cleaned);
+        if (isNumeric) {
+          const formattedAmount = Number(cleaned).toLocaleString();
+          if (formJobType === 'Contract') {
+            finalSalary = `₦${formattedAmount} for this contract`;
+          } else {
+            finalSalary = `₦${formattedAmount}/mo`;
+          }
+        } else {
+          let temp = formSalary.trim();
+          if (!temp.includes('₦')) {
+            temp = `₦${temp}`;
+          }
+          finalSalary = temp;
+        }
+      }
+
       const tags = [
         { label: formJobType, type: 'default' }
       ];
       if (formRemote) {
         tags.push({ label: '🌍 Remote', type: 'green' });
       }
-      if (formSalary.trim()) {
-        tags.push({ label: formSalary.trim(), type: 'gold' });
+      if (finalSalary) {
+        tags.push({ label: finalSalary, type: 'gold' });
       }
 
       // 3. Insert fully enriched role payload
       const { error } = await supabase.from('jobs').insert({
         role:       formRole.trim(),
         company:    userName || 'My Company',
-        salary:     formSalary.trim() || null,
+        salary:     finalSalary,
         job_type:   formJobType,
         category:   formCategory,
         emoji:      randomEmoji,
@@ -454,7 +474,12 @@ export default function EmployerScreen({ route }) {
                     <TouchableOpacity
                       key={t}
                       style={[styles.pill, formJobType === t && styles.pillActive]}
-                      onPress={() => setFormJobType(t)}
+                      onPress={() => {
+                        setFormJobType(t);
+                        if (t === 'Contract') {
+                          setFormSalary('700,000');
+                        }
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.pillText, formJobType === t && styles.pillTextActive]}>
