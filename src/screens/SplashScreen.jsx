@@ -90,6 +90,12 @@ export default function SplashScreen({ navigation }) {
       <View style={styles.loaderTrack}>
         <Animated.View style={[styles.loaderBar, { width: barWidth }]} />
       </View>
+
+      {/* Powered by Brand Footer */}
+      <Animated.View style={[styles.footer, { opacity }]}>
+        <Text style={styles.footerText}>powered by</Text>
+        <Text style={styles.footerBrand}>KODx</Text>
+      </Animated.View>
     </View>
   );
 }
@@ -131,7 +137,7 @@ const styles = StyleSheet.create({
   },
   loaderTrack: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 96,
     width: 60,
     height: 3,
     backgroundColor: 'rgba(26,26,26,0.1)',
@@ -142,5 +148,24 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#FF6B2C',
     borderRadius: 10,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerText: {
+    fontSize: 11,
+    color: '#ABABAB',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
+  footerBrand: {
+    fontSize: 12,
+    color: '#FF6B2C',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

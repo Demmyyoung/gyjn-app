@@ -72,8 +72,10 @@ export default function AuthScreen({ navigation, route }) {
 
   const isNavigating = React.useRef(false);
 
-  const handleAuthSuccess = async (user) => {
-    if (isNavigating.current) return;
+  const handleAuthSuccess = async (user, forceNavigate = false) => {
+    // If we're already navigating, skip — unless forceNavigate is set
+    // (used by onAuthStateChange so it can always complete even after a failed deep-link attempt)
+    if (isNavigating.current && !forceNavigate) return;
     isNavigating.current = true;
     
     try {
@@ -133,8 +135,7 @@ export default function AuthScreen({ navigation, route }) {
         return;
       }
 
-      // No completed profile found. Route to forms (LoginScreen)
-      // Pass the role they selected during onboarding so LoginScreen knows what forms to show.
+      // No completed profile found — route to onboarding forms
       const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
         index: 0,
@@ -142,6 +143,8 @@ export default function AuthScreen({ navigation, route }) {
       });
     } catch (err) {
       console.error('[Auth] handleAuthSuccess error:', err.message);
+      // Reset the flag so future attempts are not permanently blocked
+      isNavigating.current = false;
       const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
         index: 0,
@@ -165,11 +168,17 @@ export default function AuthScreen({ navigation, route }) {
     };
   }, []);
 
-  // Listen for auth state changes to route user
+  // Listen for auth state changes to route user.
+  // We pass forceNavigate=true so that even if the deep-link handler already set
+  // isNavigating=true (but may have failed), we still navigate successfully.
+  // We guard against duplicate calls by only acting on SIGNED_IN events.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await handleAuthSuccess(session.user);
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('[Auth] onAuthStateChange SIGNED_IN — routing user...');
+        // Reset the guard so navigation is never permanently blocked
+        isNavigating.current = false;
+        await handleAuthSuccess(session.user, true);
       }
     });
     return () => {

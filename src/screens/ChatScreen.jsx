@@ -6,6 +6,7 @@ import {
   Animated as RNAnimated, Pressable, Dimensions,
   LayoutAnimation, UIManager,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -337,6 +338,7 @@ export default function ChatScreen({ route, navigation }) {
 
   // ── Swipe-to-reply ──
   const handleSwipeReply = (msg) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setReplyTo({ id: msg.id, text: msg.text, sender_type: msg.sender_type });
     swipeableRefs.current[msg.id]?.close();
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);

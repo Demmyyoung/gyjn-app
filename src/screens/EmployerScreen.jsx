@@ -6,6 +6,7 @@ import {
   TextInput, ScrollView, ActivityIndicator, Platform,
   KeyboardAvoidingView, Alert,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -375,7 +376,10 @@ export default function EmployerScreen({ route }) {
           ListHeaderComponent={listHeader}
           ListEmptyComponent={<EmptyState onPost={openSheet} />}
           refreshing={refreshing}
-          onRefresh={() => fetchJobs(true)}
+          onRefresh={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            fetchJobs(true);
+          }}
           initialNumToRender={5}
           windowSize={5}
           maxToRenderPerBatch={5}

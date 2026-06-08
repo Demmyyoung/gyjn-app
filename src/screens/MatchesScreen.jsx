@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
   runOnJS, interpolate, withRepeat, withSequence,
@@ -32,7 +33,7 @@ const STATUS_COLORS = {
   Hired:        { bg: 'rgba(0,200,150,0.12)',  text: '#00C896' },
 };
 
-function MatchCard({ item, isNew, onPress, userType }) {
+function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
   const s = STATUS_COLORS[item.status] || STATUS_COLORS.Applied;
   const canChat = item.status === 'Interviewing' || item.status === 'Hired';
 
@@ -77,9 +78,16 @@ function MatchCard({ item, isNew, onPress, userType }) {
         </View>
         {canChat && onPress && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <View style={styles.chatActionIndicator}>
+            <TouchableOpacity 
+              style={styles.chatActionIndicator}
+              activeOpacity={0.6}
+              onPress={(e) => {
+                e.stopPropagation();
+                if (onChatPress) onChatPress();
+              }}
+            >
               <Text style={styles.chatActionText}>Chat 💬</Text>
-            </View>
+            </TouchableOpacity>
             {hasUnread && (
               <View style={styles.unreadDot} />
             )}
@@ -154,6 +162,7 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
   };
 
   const handleUnapplyPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Un - apply',
       'Do you want to un - apply for this job?',
@@ -168,7 +177,10 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         {
           text: 'Un - apply',
           style: 'destructive',
-          onPress: startDeleteAnimation,
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            startDeleteAnimation();
+          },
         },
       ]
     );
@@ -182,8 +194,13 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
 
   const handleChatNavigation = () => {
     if (!canChat) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     swipeableRef.current?.close();
     navigation.navigate('Chat', { match: item, userName, userType });
+  };
+
+  const handleSwipeableRightOpen = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const renderLeftActions = () => {
@@ -219,6 +236,7 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         renderRightActions={renderRightActions}
         renderLeftActions={renderLeftActions}
         onSwipeableLeftOpen={handleChatNavigation}
+        onSwipeableRightOpen={handleSwipeableRightOpen}
         friction={2}
         rightThreshold={40}
         leftThreshold={40}
@@ -227,6 +245,7 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
           item={item}
           isNew={isNew}
           onPress={handleCardPress}
+          onChatPress={handleChatNavigation}
           userType={userType}
         />
       </Swipeable>
@@ -435,6 +454,28 @@ export default function MatchesScreen({ route, navigation }) {
     sheetRef.current?.close();
   }, []);
 
+  // Employer: update a candidate's pipeline stage
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const handleUpdateStatus = useCallback(async (matchId, newStatus) => {
+    setUpdatingStatus(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const { error } = await supabase
+        .from('matches')
+        .update({ status: newStatus })
+        .eq('match_id', matchId);
+      if (error) throw error;
+      // Update local selectedJob state so the sheet reflects the change immediately
+      setSelectedJob((prev) => prev ? { ...prev, status: newStatus } : prev);
+      refetch();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      Alert.alert('Error', `Could not update status: ${err.message}`);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [refetch]);
+
   const renderBackdrop = useCallback(
     (props) => (
       <BottomSheetBackdrop
@@ -545,7 +586,10 @@ export default function MatchesScreen({ route, navigation }) {
           refreshControl={
             <RefreshControl
               refreshing={isFetching && !isLoading}
-              onRefresh={refetch}
+              onRefresh={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                refetch();
+              }}
               tintColor={C.orange}
             />
           }
@@ -634,21 +678,91 @@ export default function MatchesScreen({ route, navigation }) {
                 </View>
               )}
 
-              {/* Action Button */}
-              {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') ? (
-                <TouchableOpacity 
-                  style={[styles.submitBtn, { marginTop: 20 }]} 
-                  onPress={() => {
-                    closeSheet();
-                    navigation.navigate('Chat', { match: selectedJob, userName, userType });
-                  }}
-                >
-                  <Text style={styles.submitText}>Chat 💬</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
+              {/* Action Buttons */}
+              {isEmployer ? (
+                // ── Employer: Pipeline Stage Controls ──────────────────────
+                <View style={{ gap: 12, marginTop: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>MOVE CANDIDATE</Text>
+                  
+                  {/* Candidate name banner */}
+                  {selectedJob.candidate_name && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 14 }}>
+                      <Text style={{ fontSize: 20 }}>👤</Text>
+                      <View>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.night }}>{selectedJob.candidate_name}</Text>
+                        <Text style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Applicant</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Stage buttons row */}
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {['Applied', 'Interviewing', 'Hired'].map((stage) => {
+                      const isCurrent = (selectedJob.status || 'Applied') === stage;
+                      const stageColors = {
+                        Applied:      { active: C.orange,   inactive: '#FFF0E8', text: '#fff', textInactive: C.orange },
+                        Interviewing: { active: '#7B4FE9',  inactive: '#F0EAFF', text: '#fff', textInactive: '#7B4FE9' },
+                        Hired:        { active: '#00C896',  inactive: '#E6FAF5', text: '#fff', textInactive: '#00C896' },
+                      };
+                      const sc = stageColors[stage];
+                      return (
+                        <TouchableOpacity
+                          key={stage}
+                          style={[{
+                            flex: 1,
+                            paddingVertical: 12,
+                            borderRadius: 14,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: isCurrent ? sc.active : sc.inactive,
+                            opacity: updatingStatus ? 0.6 : 1,
+                          }]}
+                          disabled={isCurrent || updatingStatus}
+                          onPress={() => handleUpdateStatus(selectedJob.match_id, stage)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, letterSpacing: 0.5 }}>
+                            {stage === 'Applied' ? '📋' : stage === 'Interviewing' ? '🎤' : '🎉'}
+                          </Text>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, marginTop: 3 }}>
+                            {stage}
+                          </Text>
+                          {isCurrent && <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginTop: 2, fontWeight: '700' }}>CURRENT</Text>}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Chat button when Interviewing or Hired */}
+                  {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') && (
+                    <TouchableOpacity
+                      style={[styles.submitBtn, { marginTop: 4 }]}
+                      onPress={() => {
+                        closeSheet();
+                        navigation.navigate('Chat', { match: selectedJob, userName, userType });
+                      }}
+                    >
+                      <Text style={styles.submitText}>Chat with Candidate 💬</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
+              ) : (
+                // ── Seeker: Chat or Pending ─────────────────────────────
+                (selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') ? (
+                  <TouchableOpacity 
+                    style={[styles.submitBtn, { marginTop: 20 }]} 
+                    onPress={() => {
+                      closeSheet();
+                      navigation.navigate('Chat', { match: selectedJob, userName, userType });
+                    }}
+                  >
+                    <Text style={styles.submitText}>Chat 💬</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
+                  </View>
+                )
               )}
           </BottomSheetScrollView>
         )}

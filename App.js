@@ -1,13 +1,25 @@
 import "react-native-gesture-handler";
-import React from "react";
+import React, { useEffect } from "react";
 import { PostHogProvider } from "posthog-react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { NavigationContainer, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Text, View } from "react-native";
+import { Observe, ObserveRoot } from "expo-observe";
+import { ObserveNavigationContainer } from "expo-observe/integrations/react-navigation";
+
+// Configure EAS Observe telemetry
+Observe.configure({
+  environment: __DEV__ ? "development" : "production",
+  dispatchingEnabled: true,
+  dispatchInDebug: true,
+  integrations: {
+    "react-navigation": true,
+  },
+});
 
 import SplashScreen    from "./src/screens/SplashScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
@@ -108,38 +120,44 @@ function MainTabs() {
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  useEffect(() => {
+    Observe.markInteractive();
+  }, []);
+
   return (
-    <PostHogProvider
-      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
-      options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
-    >
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <Stack.Navigator
-              initialRouteName="Splash"
-              screenOptions={{ headerShown: false, animation: "fade" }}
-            >
-              <Stack.Screen name="Splash"      component={SplashScreen} />
-              <Stack.Screen name="Auth"        component={AuthScreen} />
-              <Stack.Screen name="Onboarding"  component={OnboardingScreen} />
-              <Stack.Screen name="Login"       component={LoginScreen} />
-              <Stack.Screen
-                name="Main"
-                component={MainTabs}
-                options={{ animation: "slide_from_right" }}
-              />
-              <Stack.Screen
-                name="Chat"
-                component={ChatScreen}
-                options={{ animation: "slide_from_right" }}
-              />
-            </Stack.Navigator>
-          </NavigationContainer>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
-    </PostHogProvider>
+    <ObserveRoot>
+      <PostHogProvider
+        apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
+        options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
+      >
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <ObserveNavigationContainer>
+              <Stack.Navigator
+                initialRouteName="Splash"
+                screenOptions={{ headerShown: false, animation: "fade" }}
+              >
+                <Stack.Screen name="Splash"      component={SplashScreen} />
+                <Stack.Screen name="Auth"        component={AuthScreen} />
+                <Stack.Screen name="Onboarding"  component={OnboardingScreen} />
+                <Stack.Screen name="Login"       component={LoginScreen} />
+                <Stack.Screen
+                  name="Main"
+                  component={MainTabs}
+                  options={{ animation: "slide_from_right" }}
+                />
+                <Stack.Screen
+                  name="Chat"
+                  component={ChatScreen}
+                  options={{ animation: "slide_from_right" }}
+                />
+              </Stack.Navigator>
+            </ObserveNavigationContainer>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+      </PostHogProvider>
+    </ObserveRoot>
   );
 }
