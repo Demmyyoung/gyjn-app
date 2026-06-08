@@ -21,30 +21,69 @@ export default function SplashScreen({ navigation }) {
       useNativeDriver: false,
     }).start();
 
+    // Helper: wraps a promise with a timeout so we never hang indefinitely
+    const withTimeout = (promise, ms) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), ms)
+        ),
+      ]);
+
+    const navigate = (timer) => {
+      clearTimeout(timer);
+    };
+
+    // Hard failsafe: if anything takes longer than 6 seconds total, go to Onboarding
+    const hardTimeout = setTimeout(() => {
+      console.warn('[Splash] Hard timeout hit — navigating to Onboarding');
+      navigation.replace('Onboarding');
+    }, 6000);
+
     const timer = setTimeout(async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          4000  // 4 s max for session fetch
+        );
+
         if (session) {
-          // Check employer profiles
-          let { data } = await supabase
-            .from('employer_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
+          // Check employer profile first (2 s timeout per query)
+          let data = null;
           let userType = 'employer';
 
-          if (!data) {
-            // Check seeker profiles
-            const seekerRes = await supabase
-              .from('seeker_profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-            data = seekerRes.data;
-            userType = 'seeker';
+          try {
+            const empRes = await withTimeout(
+              supabase
+                .from('employer_profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single(),
+              2000
+            );
+            data = empRes.data;
+          } catch (_) {
+            // timeout or error — try seeker below
           }
-          
+
+          if (!data) {
+            try {
+              const seekerRes = await withTimeout(
+                supabase
+                  .from('seeker_profiles')
+                  .select('*')
+                  .eq('id', session.user.id)
+                  .single(),
+                2000
+              );
+              data = seekerRes.data;
+              userType = 'seeker';
+            } catch (_) {
+              // timeout or error — fall through to Onboarding
+            }
+          }
+
+          clearTimeout(hardTimeout);
           if (data && data.user_name) {
             navigation.replace('Main', {
               userName:    data.user_name,
@@ -61,14 +100,20 @@ export default function SplashScreen({ navigation }) {
             navigation.replace('Onboarding');
           }
         } else {
+          clearTimeout(hardTimeout);
           navigation.replace('Onboarding');
         }
       } catch (err) {
+        console.warn('[Splash] Session fetch error or timeout:', err.message);
+        clearTimeout(hardTimeout);
         navigation.replace('Onboarding');
       }
     }, 2400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(hardTimeout);
+    };
   }, []);
 
   const barWidth = progress.interpolate({
