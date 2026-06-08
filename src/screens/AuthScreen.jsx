@@ -34,25 +34,25 @@ export default function AuthScreen({ navigation, route }) {
   const parseAndSetSession = async (url) => {
     console.log('[Auth] Parsing redirect URL:', url.substring(0, 100));
     try {
-      // Implicit flow: tokens in hash fragment
-      const hashMatch = url.match(/#access_token=([^&]+).*?refresh_token=([^&]+)/);
-      if (hashMatch) {
-        const access_token = decodeURIComponent(hashMatch[1]);
-        const refresh_token = decodeURIComponent(hashMatch[2]);
-        console.log('[Auth] Found tokens in hash, setting session...');
+      // Extract tokens regardless of # or ? and regardless of order
+      const accessTokenMatch = url.match(/[#?&]access_token=([^&]+)/);
+      const refreshTokenMatch = url.match(/[#?&]refresh_token=([^&]+)/);
+
+      if (accessTokenMatch && refreshTokenMatch) {
+        const access_token = decodeURIComponent(accessTokenMatch[1]);
+        const refresh_token = decodeURIComponent(refreshTokenMatch[1]);
+        console.log('[Auth] Found tokens, setting session...');
         const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
         console.log('[Auth] Session set for:', data?.user?.email);
-        if (data?.user) {
-          await handleAuthSuccess(data.user);
-        }
+        if (data?.user) await handleAuthSuccess(data.user);
         return;
       }
 
-      // Query param fallback (PKCE - should not occur with implicit flow but just in case)
+      // Query param fallback (PKCE)
       const codeMatch = url.match(/[?&]code=([^&]+)/);
       if (codeMatch) {
-        console.log('[Auth] Found auth code (PKCE fallback), trying exchange...');
+        console.log('[Auth] Found auth code, trying exchange...');
         const { data, error } = await supabase.auth.exchangeCodeForSession(
           decodeURIComponent(codeMatch[1])
         );
@@ -62,13 +62,20 @@ export default function AuthScreen({ navigation, route }) {
       }
 
       console.log('[Auth] No tokens or code found in redirect URL:', url.substring(0, 150));
+      setGoogleLoading(false);
     } catch (err) {
       console.error('[Auth] Failed to parse redirect:', err.message);
       Alert.alert('Sign-In Error', 'Could not complete Google sign-in. Please try again.');
+      setGoogleLoading(false);
     }
   };
 
+  const isNavigating = React.useRef(false);
+
   const handleAuthSuccess = async (user) => {
+    if (isNavigating.current) return;
+    isNavigating.current = true;
+    
     try {
       // Check employer profile first
       let { data: empData } = await supabase
@@ -134,6 +141,7 @@ export default function AuthScreen({ navigation, route }) {
         routes: [{ name: 'Login', params: { role: currentRole } }],
       });
     } catch (err) {
+      console.error('[Auth] handleAuthSuccess error:', err.message);
       const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
         index: 0,
@@ -236,7 +244,7 @@ export default function AuthScreen({ navigation, route }) {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    const redirectUrl = 'jinni://google-auth';
+    const redirectUrl = Linking.createURL('google-auth');
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -259,7 +267,7 @@ export default function AuthScreen({ navigation, route }) {
       // foreground via a jinni:// deep link, Linking fires this event.
       // This fires even while openAuthSessionAsync is still awaiting.
       const linkSub = Linking.addEventListener('url', async ({ url }) => {
-        if (url && url.startsWith('jinni://google-auth') && !resolved) {
+        if (url && url.includes('google-auth') && !resolved) {
           resolved = true;
           linkSub.remove();
           console.log('[GoogleAuth] Deep link caught via Linking:', url.substring(0, 80));

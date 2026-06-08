@@ -5,6 +5,7 @@ import {
   TouchableOpacity, ActivityIndicator, RefreshControl, TextInput,
   ScrollView, Alert, Dimensions,
 } from 'react-native';
+import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
@@ -15,12 +16,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 
 const C = {
-  orange: '#FF6B2C',
-  night:  '#1A1A2E',
-  cream:  '#FFF5EE',
-  muted:  '#5A5A7A',
-  hint:   '#BEBEBE',
-  border: '#EBEBEB',
+  orange:    '#FF6B2C',
+  night:     '#1A1A2E',
+  cream:     '#FFF5EE',
+  muted:     '#5A5A7A',
+  hint:      '#BEBEBE',
+  border:    '#EBEBEB',
+  peach:     '#FFE0CC',
+  lightGray: '#F7F7FA',
 };
 
 const STATUS_COLORS = {
@@ -95,7 +98,7 @@ function MatchCard({ item, isNew, onPress, userType }) {
 // Custom wrapper to manage row-level gesture state and exit animations.
 // It is written with React Native Reanimated to ensure smooth 60fps/120fps animations.
 // Reanimated runs animations directly on the UI thread, bypassing the React JS thread.
-function SwipeableRow({ item, isNew, onUnapplyConfirmed, navigation, userName, userType }) {
+function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigation, userName, userType }) {
   const swipeableRef = useRef(null);
   const [measuredHeight, setMeasuredHeight] = useState(0);
   const { width: SCREEN_W } = Dimensions.get('window');
@@ -172,9 +175,28 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, navigation, userName, u
   };
 
   const handleCardPress = () => {
-    if (canChat && navigation) {
-      navigation.navigate('Chat', { match: item, userName, userType });
+    if (onOpenDetails) {
+      onOpenDetails(item);
     }
+  };
+
+  const handleChatNavigation = () => {
+    if (!canChat) return;
+    swipeableRef.current?.close();
+    navigation.navigate('Chat', { match: item, userName, userType });
+  };
+
+  const renderLeftActions = () => {
+    if (!canChat) return null;
+    return (
+      <TouchableOpacity
+        style={styles.chatSwipeBtn}
+        activeOpacity={0.8}
+        onPress={handleChatNavigation}
+      >
+        <Text style={styles.chatSwipeText}>Chat 💬</Text>
+      </TouchableOpacity>
+    );
   };
 
   const renderRightActions = () => (
@@ -195,13 +217,16 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, navigation, userName, u
       <Swipeable
         ref={swipeableRef}
         renderRightActions={renderRightActions}
+        renderLeftActions={renderLeftActions}
+        onSwipeableLeftOpen={handleChatNavigation}
         friction={2}
         rightThreshold={40}
+        leftThreshold={40}
       >
         <MatchCard
           item={item}
           isNew={isNew}
-          onPress={canChat ? handleCardPress : undefined}
+          onPress={handleCardPress}
           userType={userType}
         />
       </Swipeable>
@@ -250,11 +275,19 @@ function MatchesSkeleton() {
   });
 
   return (
-    <View style={styles.skeletonList}>
-      <MatchCardSkeleton animatedStyle={animatedStyle} />
-      <MatchCardSkeleton animatedStyle={animatedStyle} />
-      <MatchCardSkeleton animatedStyle={animatedStyle} />
-      <MatchCardSkeleton animatedStyle={animatedStyle} />
+    <View style={styles.skeletonContainer}>
+      <Animated.View style={[styles.skeletonSearch, animatedStyle]} />
+      <Animated.View style={[styles.skeletonTabs, animatedStyle]}>
+        <View style={styles.skeletonTabPill} />
+        <View style={[styles.skeletonTabPill, { width: 80 }]} />
+        <View style={[styles.skeletonTabPill, { width: 100 }]} />
+      </Animated.View>
+      <View style={styles.skeletonList}>
+        <MatchCardSkeleton animatedStyle={animatedStyle} />
+        <MatchCardSkeleton animatedStyle={animatedStyle} />
+        <MatchCardSkeleton animatedStyle={animatedStyle} />
+        <MatchCardSkeleton animatedStyle={animatedStyle} />
+      </View>
     </View>
   );
 }
@@ -283,7 +316,7 @@ export default function MatchesScreen({ route, navigation }) {
         .from('matches')
         .select(`
           *,
-          jobs(role, company, emoji, job_type, salary),
+          jobs(id, role, company, emoji, job_type, salary, description, reqs, tags, colors, category),
           messages(text, sender_type, created_at)
         `);
 
@@ -389,18 +422,44 @@ export default function MatchesScreen({ route, navigation }) {
     }
   }, [refetch]);
 
+  const [selectedJob, setSelectedJob] = useState(null);
+  const sheetRef = useRef(null);
+  const snapPoints = useMemo(() => ['70%', '90%'], []);
+
+  const openSheet = useCallback((item) => {
+    setSelectedJob(item);
+    sheetRef.current?.expand();
+  }, []);
+
+  const closeSheet = useCallback(() => {
+    sheetRef.current?.close();
+  }, []);
+
+  const renderBackdrop = useCallback(
+    (props) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.3}
+      />
+    ),
+    [],
+  );
+
   const renderItem = useCallback(({ item, index }) => {
     return (
       <SwipeableRow
         item={item}
         isNew={index === 0}
         onUnapplyConfirmed={handleUnapplyConfirmed}
+        onOpenDetails={openSheet}
         navigation={navigation}
         userName={userName}
         userType={userType}
       />
     );
-  }, [handleUnapplyConfirmed, navigation, userName, userType]);
+  }, [handleUnapplyConfirmed, openSheet, navigation, userName, userType]);
 
   const keyExtractor = useCallback((item) => String(item.match_id ?? item.id), []);
 
@@ -419,7 +478,7 @@ export default function MatchesScreen({ route, navigation }) {
       </View>
 
       {/* Search Bar */}
-      {matches.length > 0 && (
+      {!isLoading && matches.length > 0 && (
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -434,7 +493,7 @@ export default function MatchesScreen({ route, navigation }) {
       )}
 
       {/* Horizontal Pipeline Filter Tabs */}
-      {matches.length > 0 && (
+      {!isLoading && matches.length > 0 && (
         <View style={styles.tabsContainer}>
           <ScrollView
             horizontal
@@ -516,6 +575,84 @@ export default function MatchesScreen({ route, navigation }) {
           }
         />
       )}
+
+      {/* Premium Job Details Bottom Sheet */}
+      <BottomSheet
+        ref={sheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        handleIndicatorStyle={styles.sheetHandle}
+        backgroundStyle={styles.sheetBg}
+      >
+        {selectedJob && (
+          <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 40 }}>
+            <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Role Details</Text>
+                <TouchableOpacity onPress={closeSheet}>
+                  <Text style={styles.sheetClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || C.peach, borderColor: 'transparent' }]}>
+                  <Text style={{ fontSize: 32 }}>{selectedJob.jobs?.emoji || '💼'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.jobs?.role}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{selectedJob.jobs?.company}</Text>
+                </View>
+              </View>
+              
+              {/* Tags */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.status || 'Applied'}</Text></View>
+                {selectedJob.jobs?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.job_type}</Text></View>}
+                {selectedJob.jobs?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.salary}</Text></View>}
+                {selectedJob.jobs?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.category}</Text></View>}
+              </View>
+
+              {/* Description */}
+              {selectedJob.jobs?.description && (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT THE ROLE</Text>
+                  <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.jobs.description}</Text>
+                </View>
+              )}
+
+              {/* Reqs */}
+              {selectedJob.jobs?.reqs && selectedJob.jobs.reqs.length > 0 && (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>REQUIREMENTS</Text>
+                  {selectedJob.jobs.reqs.map((req, i) => (
+                    <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+                      <Text style={{ color: C.orange }}>•</Text>
+                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{req}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Action Button */}
+              {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') ? (
+                <TouchableOpacity 
+                  style={[styles.submitBtn, { marginTop: 20 }]} 
+                  onPress={() => {
+                    closeSheet();
+                    navigation.navigate('Chat', { match: selectedJob, userName, userType });
+                  }}
+                >
+                  <Text style={styles.submitText}>Chat 💬</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
+                </View>
+              )}
+          </BottomSheetScrollView>
+        )}
+      </BottomSheet>
     </View>
   );
 }
@@ -525,6 +662,29 @@ const styles = StyleSheet.create({
   skeletonLine: {
     backgroundColor: '#EBEBEB',
     borderRadius: 4,
+  },
+  skeletonContainer: {
+    flex: 1,
+  },
+  skeletonSearch: {
+    backgroundColor: '#EBEBEB',
+    borderRadius: 16,
+    height: 46,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  skeletonTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginBottom: 12,
+    gap: 8,
+  },
+  skeletonTabPill: {
+    height: 36,
+    width: 60,
+    borderRadius: 20,
+    backgroundColor: '#EBEBEB',
   },
   skeletonList: {
     paddingHorizontal: 16,
@@ -645,6 +805,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
+  chatSwipeBtn: {
+    backgroundColor: C.orange,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 90,
+    borderRadius: 22,
+    marginRight: 10,
+    height: '100%',
+  },
+  chatSwipeText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
   logoBox: {
     width: 54, height: 54, borderRadius: 16,
     backgroundColor: 'rgba(255,107,44,0.1)',
@@ -695,4 +869,75 @@ const styles = StyleSheet.create({
   emptyIcon:  { fontSize: 56, marginBottom: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: C.night },
   emptyHint:  { fontSize: 13, color: C.hint, textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
+
+  // Bottom Sheet styling
+  sheetBg: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  sheetHandle: {
+    backgroundColor: '#EBEBEF',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+  },
+  sheetContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: C.night,
+    letterSpacing: -0.5,
+  },
+  sheetClose: {
+    fontSize: 16,
+    color: C.hint,
+    padding: 6,
+    fontWeight: '700',
+  },
+  submitBtn: {
+    backgroundColor: C.orange,
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 10,
+    shadowColor: C.orange,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  submitText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  detailPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: C.lightGray,
+    borderWidth: 1,
+    borderColor: '#EBEBEF',
+  },
+  detailPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.muted,
+  },
 });

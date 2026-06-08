@@ -6,7 +6,7 @@ import {
   TextInput, ScrollView, ActivityIndicator, Platform,
   KeyboardAvoidingView, Alert,
 } from 'react-native';
-import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
@@ -266,8 +266,8 @@ export default function EmployerScreen({ route }) {
         const isNumeric = /^\d+$/.test(cleaned);
         if (isNumeric) {
           const formattedAmount = Number(cleaned).toLocaleString();
-          if (formJobType === 'Contract') {
-            finalSalary = `₦${formattedAmount} for this contract`;
+          if (formJobType === 'Contract' || formJobType === 'Internship') {
+            finalSalary = `₦${formattedAmount}`;
           } else {
             finalSalary = `₦${formattedAmount}/mo`;
           }
@@ -408,7 +408,7 @@ export default function EmployerScreen({ route }) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={{ flex: 1 }}
           >
-            <ScrollView
+            <BottomSheetScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ gap: 20, paddingBottom: 40 }}
@@ -437,16 +437,19 @@ export default function EmployerScreen({ route }) {
               {/* Salary input */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>SALARY (OPTIONAL)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. ₦400k – ₦600k / mo"
-                  placeholderTextColor={C.hint}
-                  value={formSalary}
-                  onChangeText={setFormSalary}
-                  autoCorrect={false}
-                />
+                <View style={styles.salaryInputContainer}>
+                  <Text style={styles.salaryPrefix}>₦</Text>
+                  <TextInput
+                    style={[styles.input, styles.salaryInput]}
+                    placeholder={formJobType === 'Contract' ? "700,000" : "400,000"}
+                    placeholderTextColor={C.hint}
+                    value={formSalary.replace(/[₦]/g, '')}
+                    onChangeText={setFormSalary}
+                    autoCorrect={false}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
-
               {/* Job category selection pills */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>JOB CATEGORY</Text>
@@ -520,7 +523,7 @@ export default function EmployerScreen({ route }) {
                   <Text style={styles.submitText}>Post Role Live ✨</Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+            </BottomSheetScrollView>
           </KeyboardAvoidingView>
         </BottomSheetView>
       </BottomSheet>
@@ -900,14 +903,36 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   input: {
-    backgroundColor: C.lightGray,
-    borderRadius: 16,
+    backgroundColor: '#fff',
     borderWidth: 1.5,
-    borderColor: '#EBEBEF',
+    borderColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    color: C.night,
+    fontWeight: '500',
+  },
+  salaryInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+  },
+  salaryPrefix: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.orange,
+    marginRight: 4,
+  },
+  salaryInput: {
+    flex: 1,
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
     color: C.night,
   },
   pillRow: {

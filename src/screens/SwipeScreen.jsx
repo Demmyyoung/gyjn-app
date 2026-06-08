@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal, Pressable, Dimensions, Platform, NativeModules,
   ActivityIndicator, Alert,
 } from 'react-native';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const getBackendUrl = () => {
   if (process.env.EXPO_PUBLIC_BACKEND_URL) {
@@ -613,61 +614,40 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const swipedCardId = useSharedValue(null);
   const indexOffset = useSharedValue(0);
 
-  // Bottom sheet gesture and animation values
-  const sheetTranslateY = useSharedValue(0);
-  const isScrollAtTop = useSharedValue(true);
+  const sheetRef = useRef(null);
+  const snapPoints = useMemo(() => ['85%'], []);
 
   const closeDetail = useCallback(() => {
-    sheetTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
-      if (finished) {
-        runOnJS(setShowDetail)(false);
-      }
-    });
-  }, [sheetTranslateY]);
+    sheetRef.current?.close();
+  }, []);
 
   // Automatically trigger slide-up transition when details modal opens
   useEffect(() => {
     if (showDetail) {
-      sheetTranslateY.value = SCREEN_H;
-      sheetTranslateY.value = withTiming(0, { duration: 200 });
+      sheetRef.current?.expand();
+    } else {
+      sheetRef.current?.close();
     }
-  }, [showDetail, sheetTranslateY]);
+  }, [showDetail]);
 
-  // Track the ScrollView y-offset to coordinate the swipe-down-to-dismiss gesture
-  const handleScroll = useCallback((event) => {
-    isScrollAtTop.value = event.nativeEvent.contentOffset.y <= 0;
-  }, [isScrollAtTop]);
+  const handleSheetChanges = useCallback((index) => {
+    if (index === -1) {
+      setShowDetail(false);
+    }
+  }, []);
 
-  // Pan gesture allowing users to swipe the details sheet back down to dismiss it
-  const sheetPan = Gesture.Pan()
-    .activeOffsetY([0, 15]) // Only capture downward vertical drag offsets
-    .onUpdate((e) => {
-      if (isScrollAtTop.value && e.translationY > 0) {
-        sheetTranslateY.value = e.translationY;
-      }
-    })
-    .onEnd((e) => {
-      if (isScrollAtTop.value && (e.translationY > 150 || e.velocityY > 500)) {
-        sheetTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
-          if (finished) {
-            runOnJS(setShowDetail)(false);
-          }
-        });
-      } else {
-        sheetTranslateY.value = withTiming(0, { duration: 200 });
-      }
-    });
-
-  const sheetBgStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(sheetTranslateY.value, [0, SCREEN_H * 0.5], [1, 0], 'clamp');
-    return {
-      opacity,
-    };
-  });
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sheetTranslateY.value }],
-  }));
+  const renderBackdrop = useCallback(
+    (props) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.35}
+        pressBehavior="close"
+      />
+    ),
+    []
+  );
 
   const morphingContainerStyle = useAnimatedStyle(() => {
     const currentWidth = interpolate(progress.value, [0, 1], [40, SCREEN_W - 48]);
@@ -1157,54 +1137,82 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       </View>
 
       {/* Detail bottom sheet */}
-      <Modal visible={showDetail} transparent animationType="none" statusBarTranslucent={true}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeDetail}>
-          <Animated.View style={[styles.sheetBg, sheetBgStyle]} />
-        </Pressable>
-        <GestureDetector gesture={sheetPan}>
-          <Animated.View style={[styles.sheet, sheetStyle]}>
-            <View style={styles.sheetHeaderPanArea}>
-              <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeaderRow}>
-                <View style={{ flex: 1, marginRight: 16 }}>
-                  <Text style={styles.sheetRole} numberOfLines={1}>{detailJob?.role}</Text>
-                  <Text style={styles.sheetCompany}>{detailJob?.company}</Text>
-                </View>
-                <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={styles.sheetCloseBtn}>
-                  <Text style={styles.sheetClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
+      <BottomSheet
+        ref={sheetRef}
+        index={-1}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        onChange={handleSheetChanges}
+        handleIndicatorStyle={styles.sheetHandle}
+        backgroundStyle={styles.sheetBg2}
+      >
+        <BottomSheetScrollView
+          style={styles.sheetContent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ gap: 20, paddingBottom: 40 }}
+        >
+          <View style={styles.sheetHeaderRow}>
+            <Text style={styles.sheetRoleHeader}>Role Details</Text>
+            <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={styles.sheetCloseBtn}>
+              <Text style={styles.sheetClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+            <View style={[styles.detailLogoBox, { backgroundColor: detailJob?.colors?.[1] || C.peach }]}>
+              <Text style={{ fontSize: 32 }}>{detailJob?.emoji || '💼'}</Text>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ flexGrow: 0 }}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-            >
-              <View style={styles.tagsRow}>
-                {detailJob?.tags.map((t, i) => <Tag key={i} label={t.label} type={t.type} />)}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{detailJob?.role}</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{detailJob?.company}</Text>
+            </View>
+          </View>
+
+          {/* Tags */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {detailJob?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{detailJob.job_type}</Text></View>}
+            {detailJob?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{formatDisplaySalary(detailJob.salary)}</Text></View>}
+            {detailJob?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{detailJob.category}</Text></View>}
+            {detailJob?.tags?.slice(0,2).map((t, i) => (
+              <View key={i} style={[styles.detailPill, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg, borderColor: 'transparent' }]}>
+                <Text style={[styles.detailPillText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>{t.label}</Text>
               </View>
-              <Text style={styles.sheetSectionLabel}>SALARY</Text>
-              <View style={styles.salaryCard}>
-                <Text style={styles.sheetSalary}>{formatDisplaySalary(detailJob?.salary)}</Text>
-              </View>
+            ))}
+          </View>
+
+          {/* Description */}
+          {detailJob?.description && (
+            <View style={{ gap: 8 }}>
               <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
-              <Text style={styles.sheetDesc}>{detailJob?.description}</Text>
+              <Text style={styles.sheetDesc}>{detailJob.description}</Text>
+            </View>
+          )}
+
+          {/* Reqs */}
+          {detailJob?.reqs && detailJob.reqs.length > 0 && (
+            <View style={{ gap: 8 }}>
               <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
-              {detailJob?.reqs.map((r, i) => <Text key={i} style={styles.sheetReq}>• {r}</Text>)}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={{ marginTop: 24 }}
-                onPress={() => { closeDetail(); triggerSwipe('right'); }}
-              >
-                <View style={styles.sheetApply}>
-                  <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
+              {detailJob.reqs.map((r, i) => (
+                <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+                  <Text style={{ color: C.orange }}>•</Text>
+                  <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{r}</Text>
                 </View>
-              </TouchableOpacity>
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
-      </Modal>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={{ marginTop: 24 }}
+            onPress={() => { closeDetail(); triggerSwipe('right'); }}
+          >
+            <View style={styles.sheetApply}>
+              <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
+            </View>
+          </TouchableOpacity>
+        </BottomSheetScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -1394,50 +1402,39 @@ const styles = StyleSheet.create({
   reloadBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Detail sheet
-  sheetBg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
+  sheetBg2: {
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    maxHeight: SCREEN_H * 0.85,
     shadowColor: C.night,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 24,
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  sheetHeaderPanArea: {
-    paddingTop: 12,
-    paddingBottom: 12,
-    width: '100%',
+  sheetContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 4,
   },
   sheetHandle: {
+    backgroundColor: '#EBEBEF',
     width: 44,
     height: 5,
-    backgroundColor: 'rgba(0,0,0,0.12)',
     borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 16,
   },
   sheetHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  sheetRoleHeader: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: C.night,
+    letterSpacing: -0.5,
   },
   sheetCloseBtn: {
     width: 32,
@@ -1446,29 +1443,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sheetClose: {
-    fontSize: 20,
-    color: '#A0A0C0',
-    fontWeight: '500',
+    fontSize: 16,
+    color: C.hint,
+    fontWeight: '700',
   },
-  sheetRole: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: C.night,
-    letterSpacing: -0.5,
+  detailLogoBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sheetCompany: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.orange,
-    marginTop: 2,
+  detailPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F7F7FA',
+    borderWidth: 1,
+    borderColor: '#EBEBEF',
+  },
+  detailPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.muted,
   },
   sheetSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6B6B6B',
-    letterSpacing: 0.8,
-    marginTop: 22,
-    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '800',
+    color: C.muted,
+    letterSpacing: 1.0,
     textTransform: 'uppercase',
   },
   salaryCard: {
