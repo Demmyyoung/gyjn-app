@@ -1,25 +1,15 @@
 import "react-native-gesture-handler";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { PostHogProvider } from "posthog-react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRoute } from "@react-navigation/native";
+import { NavigationContainer, useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Text, View } from "react-native";
-import { Observe, ObserveRoot } from "expo-observe";
-import { ObserveNavigationContainer } from "expo-observe/integrations/react-navigation";
+import { Text, View, Pressable, Dimensions } from "react-native";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
 
-// Configure EAS Observe telemetry
-Observe.configure({
-  environment: __DEV__ ? "development" : "production",
-  dispatchingEnabled: true,
-  dispatchInDebug: true,
-  integrations: {
-    "react-navigation": true,
-  },
-});
 
 import SplashScreen    from "./src/screens/SplashScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
@@ -52,6 +42,108 @@ function TabIcon({ emoji }) {
   return <Text style={{ fontSize: 22 }}>{emoji}</Text>;
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+function CustomTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+  
+  const totalTabs = state.routes.length;
+  const containerWidth = SCREEN_WIDTH;
+  const tabWidth = containerWidth / totalTabs;
+
+  const translateX = useSharedValue(state.index * tabWidth);
+
+  useEffect(() => {
+    translateX.value = withTiming(state.index * tabWidth, {
+      duration: 150,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [state.index]);
+
+  const animatedPillStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  return (
+    <View style={{
+      backgroundColor: '#ffffff',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(0,0,0,0.06)',
+      paddingBottom: insets.bottom,
+    }}>
+      <View style={{
+        height: 58,
+        flexDirection: 'row',
+        position: 'relative',
+        alignItems: 'center',
+      }}>
+        {/* Sliding Background Pill */}
+        <Animated.View style={[
+          {
+            position: 'absolute',
+            top: 4,
+            bottom: 4,
+            left: 6,
+            width: tabWidth - 12,
+            backgroundColor: 'rgba(255, 107, 44, 0.08)',
+            borderRadius: 12,
+          },
+          animatedPillStyle
+        ]} />
+
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel !== undefined
+            ? options.tabBarLabel
+            : options.title !== undefined
+            ? options.title
+            : route.name;
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          const icon = options.tabBarIcon ? options.tabBarIcon({ focused: isFocused }) : null;
+
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                gap: 1,
+              }}
+            >
+              {icon}
+              <Text style={{
+                fontSize: 10,
+                fontWeight: '700',
+                color: isFocused ? '#FF6B2C' : '#ABABAB',
+              }}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 /**
  * MainTabs replaces MainPager. It reads the user params injected by LoginScreen
  * via the parent Stack screen's params, then passes them as initialParams to each
@@ -65,24 +157,9 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: "#FF6B2C",
-        tabBarInactiveTintColor: "#ABABAB",
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600",
-          marginTop: -2,
-          marginBottom: 2,
-        },
-        tabBarStyle: {
-          backgroundColor: "#fff",
-          borderTopWidth: 1,
-          borderTopColor: "rgba(0,0,0,0.06)",
-          paddingTop: 6,
-          paddingBottom: 4,
-        },
         // Freeze off-screen tabs to preserve memory (Constraint 4)
         freezeOnBlur: true,
       }}
@@ -120,12 +197,7 @@ function MainTabs() {
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  useEffect(() => {
-    Observe.markInteractive();
-  }, []);
-
   return (
-    <ObserveRoot>
       <PostHogProvider
         apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
         options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
@@ -133,7 +205,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
-            <ObserveNavigationContainer>
+            <NavigationContainer>
               <Stack.Navigator
                 initialRouteName="Splash"
                 screenOptions={{ headerShown: false, animation: "fade" }}
@@ -153,11 +225,10 @@ export default function App() {
                   options={{ animation: "slide_from_right" }}
                 />
               </Stack.Navigator>
-            </ObserveNavigationContainer>
+            </NavigationContainer>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
       </PostHogProvider>
-    </ObserveRoot>
   );
 }

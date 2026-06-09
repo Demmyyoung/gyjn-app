@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Pressable
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -94,7 +95,7 @@ const getBackendUrl = () => {
 };
 
 import { NativeModules } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, withSpring } from 'react-native-reanimated';
 
 export default function LoginScreen({ navigation, route }) {
   const [name, setName]               = useState('');
@@ -111,6 +112,22 @@ export default function LoginScreen({ navigation, route }) {
   const [aiParsing, setAiParsing]     = useState(false);
 
   const pulseOpacity = useSharedValue(1);
+  const buttonScale = useSharedValue(1);
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  });
+
+  const handlePressIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    buttonScale.value = withSpring(0.96, { damping: 10, stiffness: 400 });
+  };
+
+  const handlePressOut = () => {
+    buttonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
+  };
 
   React.useEffect(() => {
     if (aiParsing) {
@@ -269,7 +286,10 @@ export default function LoginScreen({ navigation, route }) {
   };
 
   const handleSubmit = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      Alert.alert('Required Field', 'Please enter your name to continue.');
+      return;
+    }
     
     if (!isEmployer && !cvUrl) {
       Alert.alert(
@@ -562,11 +582,17 @@ export default function LoginScreen({ navigation, route }) {
           )}
 
           {/* CTA */}
-          <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85}>
-            <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.ctaText}>Let's Go ✨</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <Pressable 
+            onPress={handleSubmit} 
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+          >
+            <Animated.View style={buttonAnimatedStyle}>
+              <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Text style={styles.ctaText}>Let's Go ✨</Text>
+              </LinearGradient>
+            </Animated.View>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

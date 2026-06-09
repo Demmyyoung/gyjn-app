@@ -106,6 +106,10 @@ export default function ChatScreen({ route, navigation }) {
   // Reply state
   const [replyTo, setReplyTo] = useState(null);
 
+  // Edit state
+  const [editingMsg, setEditingMsg] = useState(null);
+  const lastTapRefs = useRef({});
+
   // Long-press context menu
   const [menuMsg, setMenuMsg] = useState(null); // the message being acted on
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
@@ -134,6 +138,11 @@ export default function ChatScreen({ route, navigation }) {
     return map;
   }, [messages]);
 
+  const latestOwnMsgId = useMemo(() => {
+    const ownMsgs = messages.filter(m => m.sender_type === userType || (userType === 'seeker' && m.sender_type === 'candidate'));
+    return ownMsgs.length > 0 ? ownMsgs[ownMsgs.length - 1].id : null;
+  }, [messages, userType]);
+
   // ── Fetch messages ──
   const fetchMessages = useCallback(async () => {
     try {
@@ -144,6 +153,15 @@ export default function ChatScreen({ route, navigation }) {
         .order('created_at', { ascending: true });
       if (error) throw error;
       setMessages(data ?? []);
+
+      // Mark unread received messages as seen
+      const unreadIds = (data ?? [])
+        .filter(m => (m.sender_type !== userType && !(userType === 'seeker' && m.sender_type === 'candidate')) && m.status !== 'seen')
+        .map(m => m.id);
+      
+      if (unreadIds.length > 0) {
+        supabase.from('messages').update({ status: 'seen' }).in('id', unreadIds).then();
+      }
     } catch (err) {
       console.warn('[ChatScreen] fetch error:', err.message);
     } finally {
@@ -166,7 +184,17 @@ export default function ChatScreen({ route, navigation }) {
           if (prev.some((msg) => msg.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
-        if (payload.new.sender_type !== userType && !(userType === 'seeker' && payload.new.sender_type === 'candidate')) setRemoteIsTyping(false);
+        const isRemote = payload.new.sender_type !== userType && !(userType === 'seeker' && payload.new.sender_type === 'candidate');
+        if (isRemote) {
+          setRemoteIsTyping(false);
+          supabase.from('messages').update({ status: 'seen' }).eq('id', payload.new.id).then();
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `match_id=eq.${matchId}`,
+      }, (payload) => {
+        setMessages((prev) => prev.map((msg) => msg.id === payload.new.id ? payload.new : msg));
       })
       .on('postgres_changes', {
         event: 'DELETE', schema: 'public', table: 'messages',
@@ -252,6 +280,30 @@ export default function ChatScreen({ route, navigation }) {
   const handleSend = async () => {
     if (!inputText.trim()) return;
     const typedText = inputText.trim();
+    
+    if (editingMsg) {
+      setSending(true);
+      // Optimistic update
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setMessages((prev) => prev.map((msg) => msg.id === editingMsg.id ? { ...msg, text: typedText } : msg));
+      setInputText('');
+      setEditingMsg(null);
+      
+      try {
+        const { error } = await supabase.from('messages').update({ text: typedText }).eq('id', editingMsg.id);
+        if (error) throw error;
+      } catch (err) {
+        Alert.alert('Edit failed', err.message);
+        // Revert on fail
+        setMessages((prev) => prev.map((msg) => msg.id === editingMsg.id ? { ...msg, text: editingMsg.text } : msg));
+        setInputText(typedText);
+        setEditingMsg(editingMsg);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
     const replyId = replyTo?.id || null;
     setInputText('');
     setReplyTo(null);
@@ -344,15 +396,81 @@ export default function ChatScreen({ route, navigation }) {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
   };
 
-  const renderLeftActions = (progress) => {
-    const translateX = progress.interpolate({
-      inputRange: [0, 1], outputRange: [-60, 0],
+  const renderLeftActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 20, 60, 100],
+      outputRange: [0.3, 0.5, 1, 1],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [0, 20, 60, 100],
+      outputRange: [0, 0.3, 1, 1],
+      extrapolate: 'clamp',
+    });
+    const rotate = dragX.interpolate({
+      inputRange: [0, 60],
+      outputRange: ['-45deg', '0deg'],
+      extrapolate: 'clamp',
     });
     return (
-      <RNAnimated.View style={[styles.swipeAction, { transform: [{ translateX }] }]}>
-        <Text style={styles.swipeActionText}>↩️</Text>
-        <Text style={styles.swipeActionLabel}>Reply</Text>
-      </RNAnimated.View>
+      <View style={{
+        width: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingLeft: 8,
+      }}>
+        <RNAnimated.View style={{
+          transform: [{ scale }, { rotate }],
+          opacity,
+          backgroundColor: 'rgba(255, 107, 44, 0.12)',
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <Text style={{ fontSize: 16, color: C.orange, marginTop: -2 }}>↩️</Text>
+        </RNAnimated.View>
+      </View>
+    );
+  };
+
+  const renderRightActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, -60, -20, 0],
+      outputRange: [1, 1, 0.5, 0.3],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [-100, -60, -20, 0],
+      outputRange: [1, 1, 0.3, 0],
+      extrapolate: 'clamp',
+    });
+    const rotate = dragX.interpolate({
+      inputRange: [-60, 0],
+      outputRange: ['0deg', '45deg'],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View style={{
+        width: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingRight: 8,
+      }}>
+        <RNAnimated.View style={{
+          transform: [{ scale }, { rotate }],
+          opacity,
+          backgroundColor: 'rgba(255, 107, 44, 0.12)',
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <Text style={{ fontSize: 16, color: C.orange, marginTop: -2 }}>↩️</Text>
+        </RNAnimated.View>
+      </View>
     );
   };
 
@@ -381,55 +499,81 @@ export default function ChatScreen({ route, navigation }) {
     const repliedMsg = item.reply_to ? msgMap[item.reply_to] : null;
 
     const bubble = (
-      <Pressable
-        onLongPress={(evt) => handleLongPress(item, evt)}
-        delayLongPress={400}
-        style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
-      >
-        <View
-          style={[
-            styles.msgBubble,
-            isMine ? styles.msgBubbleRight : styles.msgBubbleLeft,
-          ]}
+      <View style={{ width: '100%', marginBottom: (isMine && item.id === latestOwnMsgId) ? 14 : 0 }}>
+        <Pressable
+          onPress={() => {
+            const now = Date.now();
+            const lastTap = lastTapRefs.current[item.id] || 0;
+            if (now - lastTap < 300) {
+              if (isMine) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setEditingMsg(item);
+                setInputText(item.text);
+                inputRef.current?.focus();
+              }
+            }
+            lastTapRefs.current[item.id] = now;
+          }}
+          onLongPress={(evt) => handleLongPress(item, evt)}
+          delayLongPress={400}
+          style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
         >
-          {/* Reply quote */}
-          {repliedMsg && (
-            <View style={[
-              styles.replyQuote,
-              isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs,
-            ]}>
-              <Text style={[styles.replyQuoteSender, isMine && { color: 'rgba(255,255,255,0.8)' }]}>
-                {repliedMsg.sender_type === userType || (userType === 'seeker' && repliedMsg.sender_type === 'candidate') ? 'You' : recipientName}
-              </Text>
-              <Text
-                style={[styles.replyQuoteText, isMine && { color: 'rgba(255,255,255,0.7)' }]}
-                numberOfLines={2}
-              >
-                {repliedMsg.text}
-              </Text>
-            </View>
-          )}
+          <View
+            style={[
+              styles.msgBubble,
+              isMine ? styles.msgBubbleRight : styles.msgBubbleLeft,
+            ]}
+          >
+            {/* Reply quote */}
+            {repliedMsg && (
+              <View style={[
+                styles.replyQuote,
+                isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs,
+              ]}>
+                <Text style={[styles.replyQuoteSender, isMine && { color: 'rgba(255,255,255,0.8)' }]}>
+                  {repliedMsg.sender_type === userType || (userType === 'seeker' && repliedMsg.sender_type === 'candidate') ? 'You' : recipientName}
+                </Text>
+                <Text
+                  style={[styles.replyQuoteText, isMine && { color: 'rgba(255,255,255,0.7)' }]}
+                  numberOfLines={2}
+                >
+                  {repliedMsg.text}
+                </Text>
+              </View>
+            )}
 
-          <Text style={[styles.msgText, isMine ? styles.msgTextRight : styles.msgTextLeft]}>
-            {item.text}
+            <Text style={[styles.msgText, isMine ? styles.msgTextRight : styles.msgTextLeft]}>
+              {item.text}
+            </Text>
+            <Text style={[styles.msgTime, isMine ? styles.msgTimeRight : styles.msgTimeLeft]}>
+              {item.is_edited && <Text style={{ fontStyle: 'italic' }}>(edited) </Text>}
+              {new Date(item.created_at).toLocaleTimeString([], {
+                hour: '2-digit', minute: '2-digit',
+              })}
+            </Text>
+          </View>
+        </Pressable>
+        {isMine && item.id === latestOwnMsgId && (
+          <Text style={{ fontSize: 10, color: C.muted, position: 'absolute', bottom: -12, right: 8, fontWeight: '500' }}>
+            {item.status === 'seen' ? 'Seen' : item.status === 'delivered' ? 'Delivered' : 'Sent'}
           </Text>
-          <Text style={[styles.msgTime, isMine ? styles.msgTimeRight : styles.msgTimeLeft]}>
-            {new Date(item.created_at).toLocaleTimeString([], {
-              hour: '2-digit', minute: '2-digit',
-            })}
-          </Text>
-        </View>
-      </Pressable>
+        )}
+      </View>
     );
 
     return (
       <Swipeable
         ref={(ref) => { swipeableRefs.current[item.id] = ref; }}
-        renderLeftActions={renderLeftActions}
-        onSwipeableOpen={() => handleSwipeReply(item)}
-        overshootLeft={false}
+        renderLeftActions={!isMine ? renderLeftActions : undefined}
+        renderRightActions={isMine ? renderRightActions : undefined}
+        onSwipeableLeftWillOpen={!isMine ? () => handleSwipeReply(item) : undefined}
+        onSwipeableRightWillOpen={isMine ? () => handleSwipeReply(item) : undefined}
+        overshootLeft={!isMine}
+        overshootRight={isMine}
         friction={2}
-        leftThreshold={40}
+        overshootFriction={8}
+        leftThreshold={60}
+        rightThreshold={60}
       >
         {bubble}
       </Swipeable>
@@ -439,8 +583,8 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar barStyle="dark-content" />
 
@@ -521,7 +665,7 @@ export default function ChatScreen({ route, navigation }) {
       )}
 
       {/* Reply Preview Bar */}
-      {replyTo && (
+      {replyTo && !editingMsg && (
         <View style={styles.replyBar}>
           <View style={styles.replyBarAccent} />
           <View style={styles.replyBarContent}>
@@ -534,6 +678,28 @@ export default function ChatScreen({ route, navigation }) {
           </View>
           <TouchableOpacity
             onPress={() => setReplyTo(null)}
+            style={styles.replyBarClose}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.replyBarCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Edit Preview Bar */}
+      {editingMsg && (
+        <View style={styles.replyBar}>
+          <View style={[styles.replyBarAccent, { backgroundColor: C.orange }]} />
+          <View style={styles.replyBarContent}>
+            <Text style={[styles.replyBarSender, { color: C.orange }]}>
+               Editing Message
+            </Text>
+            <Text style={styles.replyBarText} numberOfLines={1}>
+              {editingMsg.text}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { setEditingMsg(null); setInputText(''); }}
             style={styles.replyBarClose}
             activeOpacity={0.7}
           >
@@ -564,7 +730,7 @@ export default function ChatScreen({ route, navigation }) {
         <TextInput
           ref={inputRef}
           style={styles.textInput}
-          placeholder={replyTo ? 'Type your reply...' : 'Type your message...'}
+          placeholder={editingMsg ? 'Editing message...' : replyTo ? 'Type your reply...' : 'Type your message...'}
           placeholderTextColor={C.hint}
           value={inputText}
           onChangeText={handleTextChange}

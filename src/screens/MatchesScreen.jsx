@@ -52,23 +52,42 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
       disabled={!onPress}
     >
       {/* Logo / initials box */}
-      <View style={styles.logoBox}>
-        <Text style={styles.logoEmoji}>{item.jobs?.emoji ?? '💼'}</Text>
+      <View style={[styles.logoBox, userType === 'employer' && { backgroundColor: C.peach }]}>
+        {userType === 'employer' ? (
+          <Text style={[styles.logoEmoji, { color: C.orange, fontSize: 24, fontWeight: '800' }]}>
+            {(item.candidate_name || '👤').substring(0, 1).toUpperCase()}
+          </Text>
+        ) : (
+          <Text style={styles.logoEmoji}>{item.jobs?.emoji ?? '💼'}</Text>
+        )}
       </View>
 
       {/* Info */}
       <View style={styles.cardInfo}>
-        <Text style={styles.cardRole} numberOfLines={1}>
-          {item.jobs?.role ?? 'Role'}
-        </Text>
-        <Text style={styles.cardCompany} numberOfLines={1}>
-          {item.jobs?.company ?? ''}{item.jobs?.job_type ? ` · ${item.jobs.job_type}` : ''}
-        </Text>
-        {item.candidate_name ? (
-          <Text style={styles.cardCandidate} numberOfLines={1}>
-            👤 {item.candidate_name}
-          </Text>
-        ) : null}
+        {userType === 'employer' ? (
+          <>
+            <Text style={styles.cardRole} numberOfLines={1}>
+              {item.candidate_name || 'Applicant'}
+            </Text>
+            <Text style={styles.cardCompany} numberOfLines={1}>
+              {item.candidate_role || 'Professional'}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <View style={{ backgroundColor: '#F7F7FA', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#EBEBEB' }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: '#5A5A7A' }}>For: {item.jobs?.role ?? 'Role'}</Text>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.cardRole} numberOfLines={1}>
+              {item.jobs?.role ?? 'Role'}
+            </Text>
+            <Text style={styles.cardCompany} numberOfLines={1}>
+              {item.jobs?.company ?? ''}{item.jobs?.job_type ? ` · ${item.jobs.job_type}` : ''}
+            </Text>
+          </>
+        )}
       </View>
 
       {/* Right: status + new badge */}
@@ -216,15 +235,18 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
     );
   };
 
-  const renderRightActions = () => (
-    <TouchableOpacity
-      style={styles.unapplySwipeBtn}
-      activeOpacity={0.8}
-      onPress={handleUnapplyPress}
-    >
-      <Text style={styles.unapplySwipeText}>Un - apply ✕</Text>
-    </TouchableOpacity>
-  );
+  const renderRightActions = () => {
+    if (userType === 'employer') return null; // Remove for employers
+    return (
+      <TouchableOpacity
+        style={styles.unapplySwipeBtn}
+        activeOpacity={0.8}
+        onPress={handleUnapplyPress}
+      >
+        <Text style={styles.unapplySwipeText}>Un - apply ✕</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Animated.View
@@ -235,9 +257,9 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         ref={swipeableRef}
         renderRightActions={renderRightActions}
         renderLeftActions={renderLeftActions}
-        onSwipeableLeftOpen={handleChatNavigation}
-        onSwipeableRightOpen={handleSwipeableRightOpen}
-        friction={2}
+        onSwipeableLeftWillOpen={handleChatNavigation}
+        onSwipeableRightWillOpen={handleSwipeableRightOpen}
+        friction={1}
         rightThreshold={40}
         leftThreshold={40}
       >
@@ -442,6 +464,54 @@ export default function MatchesScreen({ route, navigation }) {
   }, [refetch]);
 
   const [selectedJob, setSelectedJob] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState(null);
+
+  const generateAiRecommendation = async (force = false) => {
+    if (!selectedJob || analyzing) return;
+    setAnalyzing(true);
+    setAnalysisError(null);
+
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://gyjn-dashboard.vercel.app';
+      const response = await fetch(`${backendUrl}/api/analyze-match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          record: {
+            match_id: selectedJob.match_id,
+            job_id: selectedJob.jobs?.id,
+            cv_url: selectedJob.cv_url,
+            candidate_name: selectedJob.candidate_name,
+            candidate_role: selectedJob.candidate_role,
+            about_me: selectedJob.about_me,
+            job_type_preference: selectedJob.job_type_preference,
+            skills: selectedJob.skills,
+          }
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to analyze candidate match.');
+
+      if (result.success && result.aiResult) {
+        const updated = {
+          ...selectedJob,
+          ai_summary: result.aiResult.ai_summary,
+          ai_opinion: result.aiResult.ai_opinion,
+          candidate_role: result.aiResult.candidate_role || selectedJob.candidate_role,
+          skills: result.aiResult.skills || selectedJob.skills,
+        };
+        setSelectedJob(updated);
+        refetch();
+      }
+    } catch (err) {
+      console.warn('[AI Recommendation] Error:', err);
+      setAnalysisError(err.message || 'An error occurred during analysis.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => ['70%', '90%'], []);
 
@@ -629,140 +699,234 @@ export default function MatchesScreen({ route, navigation }) {
         backdropComponent={renderBackdrop}
         handleIndicatorStyle={styles.sheetHandle}
         backgroundStyle={styles.sheetBg}
+        style={{ zIndex: 9999, elevation: 100 }}
       >
         {selectedJob && (
           <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 40 }}>
-            <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Role Details</Text>
-                <TouchableOpacity onPress={closeSheet}>
-                  <Text style={styles.sheetClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-                <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || C.peach, borderColor: 'transparent' }]}>
-                  <Text style={{ fontSize: 32 }}>{selectedJob.jobs?.emoji || '💼'}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.jobs?.role}</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{selectedJob.jobs?.company}</Text>
-                </View>
-              </View>
-              
-              {/* Tags */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.status || 'Applied'}</Text></View>
-                {selectedJob.jobs?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.job_type}</Text></View>}
-                {selectedJob.jobs?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.salary}</Text></View>}
-                {selectedJob.jobs?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.category}</Text></View>}
-              </View>
-
-              {/* Description */}
-              {selectedJob.jobs?.description && (
-                <View style={{ gap: 8 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT THE ROLE</Text>
-                  <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.jobs.description}</Text>
-                </View>
-              )}
-
-              {/* Reqs */}
-              {selectedJob.jobs?.reqs && selectedJob.jobs.reqs.length > 0 && (
-                <View style={{ gap: 8 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>REQUIREMENTS</Text>
-                  {selectedJob.jobs.reqs.map((req, i) => (
-                    <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
-                      <Text style={{ color: C.orange }}>•</Text>
-                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{req}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Action Buttons */}
               {isEmployer ? (
-                // ── Employer: Pipeline Stage Controls ──────────────────────
-                <View style={{ gap: 12, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>MOVE CANDIDATE</Text>
-                  
-                  {/* Candidate name banner */}
-                  {selectedJob.candidate_name && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 14 }}>
-                      <Text style={{ fontSize: 20 }}>👤</Text>
-                      <View>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.night }}>{selectedJob.candidate_name}</Text>
-                        <Text style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Applicant</Text>
+                // ── Employer View: Candidate Profile ──────────────────────
+                <>
+                  <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>Candidate Profile</Text>
+                    <TouchableOpacity onPress={closeSheet}>
+                      <Text style={styles.sheetClose}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                    <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: C.peach, borderColor: 'transparent' }]}>
+                      <Text style={{ fontSize: 28, fontWeight: '800', color: C.orange }}>
+                        {(selectedJob.candidate_name || '👤').substring(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.candidate_name || 'Applicant'}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: C.muted, marginTop: 2 }}>{selectedJob.candidate_role || 'Professional'}</Text>
+                      <View style={{ flexDirection: 'row', marginTop: 6 }}>
+                        <View style={{ backgroundColor: '#F7F7FA', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#EBEBEB' }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#5A5A7A' }}>Applied for: {selectedJob.jobs?.role}</Text>
+                        </View>
                       </View>
+                    </View>
+                  </View>
+
+                  {/* AI Recruiter Insights */}
+                  <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#EBEBEB', padding: 16, position: 'relative' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.orange, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                        ✨ AI Recruiter Insights
+                      </Text>
+                      {selectedJob.ai_summary && !analyzing && (
+                        <TouchableOpacity onPress={() => generateAiRecommendation(true)}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.hint }}>Regenerate ↺</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    
+                    {analyzing ? (
+                      <View style={{ gap: 8 }}>
+                        <View style={{ height: 12, backgroundColor: '#F0F0F0', borderRadius: 4, width: '80%' }} />
+                        <View style={{ height: 12, backgroundColor: '#F0F0F0', borderRadius: 4, width: '95%' }} />
+                        <View style={{ height: 12, backgroundColor: '#F0F0F0', borderRadius: 4, width: '60%' }} />
+                        <View style={{ height: 40, backgroundColor: '#F0F0F0', borderRadius: 8, marginTop: 8 }} />
+                      </View>
+                    ) : analysisError ? (
+                      <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.15)' }}>
+                        <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>⚠️ {analysisError}</Text>
+                        <TouchableOpacity onPress={() => generateAiRecommendation(true)} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+                          <Text style={{ color: C.orange, fontSize: 11, fontWeight: '800' }}>Try Again</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : selectedJob.ai_summary ? (
+                      <View style={{ gap: 12 }}>
+                        <View>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.muted, marginBottom: 4 }}>Profile & CV Summary</Text>
+                          <Text style={{ fontSize: 14, color: C.night, lineHeight: 20 }}>{selectedJob.ai_summary}</Text>
+                        </View>
+                        <View style={{ backgroundColor: C.cream, borderRadius: 10, padding: 12, borderLeftWidth: 3, borderLeftColor: C.orange }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.night, marginBottom: 2 }}>Recruiter's Take</Text>
+                          <Text style={{ fontSize: 13, color: C.muted, lineHeight: 18, fontWeight: '500' }}>{selectedJob.ai_opinion}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ alignItems: 'center', paddingVertical: 16, borderWidth: 1.5, borderColor: '#EBEBEB', borderStyle: 'dashed', borderRadius: 12 }}>
+                        <Text style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>No AI evaluation available yet.</Text>
+                        <TouchableOpacity 
+                          style={{ backgroundColor: C.orange, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+                          onPress={() => generateAiRecommendation(true)}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Generate Insights</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* About */}
+                  {selectedJob.about_me ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT</Text>
+                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.about_me}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* Skills */}
+                  {selectedJob.skills && selectedJob.skills.length > 0 ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>SKILLS</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {selectedJob.skills.map((skill, i) => (
+                          <View key={i} style={styles.detailPill || { backgroundColor: '#F7F7FA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#EBEBEB' }}>
+                            <Text style={styles.detailPillText || { fontSize: 12, color: C.night, fontWeight: '600' }}>{skill}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Action Buttons (Pipeline & Chat) */}
+                  <View style={{ gap: 12, marginTop: 8, borderTopWidth: 1, borderColor: '#F0F0F0', paddingTop: 16 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>MOVE CANDIDATE</Text>
+                    
+                    {/* Enhanced Stage buttons row */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {['Applied', 'Interviewing', 'Hired'].map((stage) => {
+                        const isCurrent = (selectedJob.status || 'Applied') === stage;
+                        const stageColors = {
+                          Applied:      { active: C.orange,   inactive: '#FFF0E8', text: '#fff', textInactive: C.orange },
+                          Interviewing: { active: '#7B4FE9',  inactive: '#F0EAFF', text: '#fff', textInactive: '#7B4FE9' },
+                          Hired:        { active: '#00C896',  inactive: '#E6FAF5', text: '#fff', textInactive: '#00C896' },
+                        };
+                        const sc = stageColors[stage];
+                        return (
+                          <TouchableOpacity
+                            key={stage}
+                            style={[{
+                              flex: 1,
+                              paddingVertical: 14,
+                              borderRadius: 16,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isCurrent ? sc.active : sc.inactive,
+                              opacity: updatingStatus ? 0.6 : 1,
+                              borderWidth: 1.5,
+                              borderColor: isCurrent ? sc.active : 'transparent',
+                            }]}
+                            disabled={isCurrent || updatingStatus}
+                            onPress={() => handleUpdateStatus(selectedJob.match_id, stage)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, letterSpacing: 0.5 }}>
+                              {stage === 'Applied' ? '📋' : stage === 'Interviewing' ? '🎤' : '🎉'}
+                            </Text>
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, marginTop: 4 }}>
+                              {stage}
+                            </Text>
+                            {isCurrent && <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)', marginTop: 2, fontWeight: '800', letterSpacing: 0.5 }}>CURRENT</Text>}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Chat button */}
+                    {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') && (
+                      <TouchableOpacity
+                        style={[styles.submitBtn, { marginTop: 8 }]}
+                        onPress={() => {
+                          closeSheet();
+                          navigation.navigate('Chat', { match: selectedJob, userName, userType });
+                        }}
+                      >
+                        <Text style={styles.submitText}>Chat with Candidate 💬</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              ) : (
+                // ── Seeker View: Job Details ──────────────────────
+                <>
+                  <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>Role Details</Text>
+                    <TouchableOpacity onPress={closeSheet}>
+                      <Text style={styles.sheetClose}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                    <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || C.peach, borderColor: 'transparent' }]}>
+                      <Text style={{ fontSize: 32 }}>{selectedJob.jobs?.emoji || '💼'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.jobs?.role}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{selectedJob.jobs?.company}</Text>
+                    </View>
+                  </View>
+                  
+                  {/* Tags */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.status || 'Applied'}</Text></View>
+                    {selectedJob.jobs?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.job_type}</Text></View>}
+                    {selectedJob.jobs?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.salary}</Text></View>}
+                    {selectedJob.jobs?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.category}</Text></View>}
+                  </View>
+
+                  {/* Description */}
+                  {selectedJob.jobs?.description && (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT THE ROLE</Text>
+                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.jobs.description}</Text>
                     </View>
                   )}
 
-                  {/* Stage buttons row */}
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {['Applied', 'Interviewing', 'Hired'].map((stage) => {
-                      const isCurrent = (selectedJob.status || 'Applied') === stage;
-                      const stageColors = {
-                        Applied:      { active: C.orange,   inactive: '#FFF0E8', text: '#fff', textInactive: C.orange },
-                        Interviewing: { active: '#7B4FE9',  inactive: '#F0EAFF', text: '#fff', textInactive: '#7B4FE9' },
-                        Hired:        { active: '#00C896',  inactive: '#E6FAF5', text: '#fff', textInactive: '#00C896' },
-                      };
-                      const sc = stageColors[stage];
-                      return (
-                        <TouchableOpacity
-                          key={stage}
-                          style={[{
-                            flex: 1,
-                            paddingVertical: 12,
-                            borderRadius: 14,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: isCurrent ? sc.active : sc.inactive,
-                            opacity: updatingStatus ? 0.6 : 1,
-                          }]}
-                          disabled={isCurrent || updatingStatus}
-                          onPress={() => handleUpdateStatus(selectedJob.match_id, stage)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, letterSpacing: 0.5 }}>
-                            {stage === 'Applied' ? '📋' : stage === 'Interviewing' ? '🎤' : '🎉'}
-                          </Text>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, marginTop: 3 }}>
-                            {stage}
-                          </Text>
-                          {isCurrent && <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', marginTop: 2, fontWeight: '700' }}>CURRENT</Text>}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  {/* Reqs */}
+                  {selectedJob.jobs?.reqs && selectedJob.jobs.reqs.length > 0 && (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>REQUIREMENTS</Text>
+                      {selectedJob.jobs.reqs.map((req, i) => (
+                        <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+                          <Text style={{ color: C.orange }}>•</Text>
+                          <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{req}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
-                  {/* Chat button when Interviewing or Hired */}
-                  {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') && (
-                    <TouchableOpacity
-                      style={[styles.submitBtn, { marginTop: 4 }]}
+                  {/* Action Buttons */}
+                  {(selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') ? (
+                    <TouchableOpacity 
+                      style={[styles.submitBtn, { marginTop: 20 }]} 
                       onPress={() => {
                         closeSheet();
                         navigation.navigate('Chat', { match: selectedJob, userName, userType });
                       }}
                     >
-                      <Text style={styles.submitText}>Chat with Candidate 💬</Text>
+                      <Text style={styles.submitText}>Chat 💬</Text>
                     </TouchableOpacity>
+                  ) : (
+                    <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
+                    </View>
                   )}
-                </View>
-              ) : (
-                // ── Seeker: Chat or Pending ─────────────────────────────
-                (selectedJob.status === 'Interviewing' || selectedJob.status === 'Hired') ? (
-                  <TouchableOpacity 
-                    style={[styles.submitBtn, { marginTop: 20 }]} 
-                    onPress={() => {
-                      closeSheet();
-                      navigation.navigate('Chat', { match: selectedJob, userName, userType });
-                    }}
-                  >
-                    <Text style={styles.submitText}>Chat 💬</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
-                  </View>
-                )
+                </>
               )}
           </BottomSheetScrollView>
         )}

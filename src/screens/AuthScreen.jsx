@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Pressable
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
@@ -29,11 +32,30 @@ export default function AuthScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const buttonScale = useSharedValue(1);
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }]
+  }));
+
+  const handlePressIn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    buttonScale.value = withSpring(0.96, { damping: 10, stiffness: 400 });
+  };
+  const handlePressOut = () => {
+    buttonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
+  };
+
   // With implicit flow, Supabase returns tokens directly in the URL hash.
   // e.g. jinni://google-auth#access_token=...&refresh_token=...
   const parseAndSetSession = async (url) => {
-    console.log('[Auth] Parsing redirect URL:', url.substring(0, 100));
     try {
+      const errorMatch = url.match(/[#?&]error=([^&]+)/);
+      if (errorMatch) {
+        const errorDesc = url.match(/[#?&]error_description=([^&]+)/);
+        const msg = errorDesc ? decodeURIComponent(errorDesc[1]).replace(/\+/g, ' ') : decodeURIComponent(errorMatch[1]);
+        throw new Error(msg);
+      }
+
       // Extract tokens regardless of # or ? and regardless of order
       const accessTokenMatch = url.match(/[#?&]access_token=([^&]+)/);
       const refreshTokenMatch = url.match(/[#?&]refresh_token=([^&]+)/);
@@ -41,50 +63,86 @@ export default function AuthScreen({ navigation, route }) {
       if (accessTokenMatch && refreshTokenMatch) {
         const access_token = decodeURIComponent(accessTokenMatch[1]);
         const refresh_token = decodeURIComponent(refreshTokenMatch[1]);
-        console.log('[Auth] Found tokens, setting session...');
         const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
-        console.log('[Auth] Session set for:', data?.user?.email);
-        if (data?.user) await handleAuthSuccess(data.user);
+        if (data?.session) await handleAuthSuccess(data.session.user, data.session.access_token);
         return;
       }
 
       // Query param fallback (PKCE)
       const codeMatch = url.match(/[?&]code=([^&]+)/);
       if (codeMatch) {
-        console.log('[Auth] Found auth code, trying exchange...');
         const { data, error } = await supabase.auth.exchangeCodeForSession(
           decodeURIComponent(codeMatch[1])
         );
         if (error) throw error;
-        if (data?.user) await handleAuthSuccess(data.user);
+        if (data?.session) await handleAuthSuccess(data.session.user, data.session.access_token);
         return;
       }
 
-      console.log('[Auth] No tokens or code found in redirect URL:', url.substring(0, 150));
+      Alert.alert('Sign-In Error', 'No authorization tokens or code were found in the response URL.');
       setGoogleLoading(false);
     } catch (err) {
       console.error('[Auth] Failed to parse redirect:', err.message);
-      Alert.alert('Sign-In Error', 'Could not complete Google sign-in. Please try again.');
+      Alert.alert('Google Sign-In Error', err.message || 'Could not complete Google sign-in. Please try again.');
       setGoogleLoading(false);
     }
   };
 
   const isNavigating = React.useRef(false);
 
-  const handleAuthSuccess = async (user, forceNavigate = false) => {
-    // If we're already navigating, skip — unless forceNavigate is set
-    // (used by onAuthStateChange so it can always complete even after a failed deep-link attempt)
+  const fetchProfileDirect = async (table, userId, accessToken) => {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('[Jinni] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    }
+
+    const url = `${supabaseUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(userId)}&select=*&limit=1`;
+    
+    // Add an AbortController so it physically cannot hang forever
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '(unreadable body)');
+        throw new Error(`[Jinni] REST ${table} query failed — HTTP ${res.status}: ${body}`);
+      }
+
+      const rows = await res.json();
+      return rows.length > 0 ? rows[0] : null;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  };
+
+  const handleAuthSuccess = async (user, accessToken, forceNavigate = false) => {
     if (isNavigating.current && !forceNavigate) return;
     isNavigating.current = true;
     
+    if (!accessToken) {
+      isNavigating.current = false;
+      return;
+    }
+
     try {
-      // Check employer profile first
-      let { data: empData } = await supabase
-        .from('employer_profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const empData = await fetchProfileDirect('employer_profiles', user.id, accessToken);
 
       if (empData && empData.user_name) {
         navigation.reset({
@@ -107,12 +165,7 @@ export default function AuthScreen({ navigation, route }) {
         return;
       }
 
-      // Check seeker profile
-      let { data: seekerData } = await supabase
-        .from('seeker_profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const seekerData = await fetchProfileDirect('seeker_profiles', user.id, accessToken);
 
       if (seekerData && seekerData.user_name) {
         navigation.reset({
@@ -135,7 +188,6 @@ export default function AuthScreen({ navigation, route }) {
         return;
       }
 
-      // No completed profile found — route to onboarding forms
       const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
         index: 0,
@@ -143,7 +195,6 @@ export default function AuthScreen({ navigation, route }) {
       });
     } catch (err) {
       console.error('[Auth] handleAuthSuccess error:', err.message);
-      // Reset the flag so future attempts are not permanently blocked
       isNavigating.current = false;
       const currentRole = route?.params?.role || 'seeker';
       navigation.reset({
@@ -156,13 +207,21 @@ export default function AuthScreen({ navigation, route }) {
   // For handling the deep link redirect in expo-web-browser manually
   useEffect(() => {
     const handleDeepLink = (event) => {
-      const url = event.url;
+      const url = typeof event === 'string' ? event : event?.url;
       console.log('Intercepted deep link event URL:', url);
       if (url && (url.includes('jinni://') || url.includes('google-auth') || url.includes('--/google-auth'))) {
         parseAndSetSession(url);
       }
     };
     const subscription = Linking.addEventListener('url', handleDeepLink);
+    
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('Got initial URL on mount:', url);
+        handleDeepLink(url);
+      }
+    });
+
     return () => {
       subscription.remove();
     };
@@ -176,9 +235,7 @@ export default function AuthScreen({ navigation, route }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         console.log('[Auth] onAuthStateChange SIGNED_IN — routing user...');
-        // Reset the guard so navigation is never permanently blocked
-        isNavigating.current = false;
-        await handleAuthSuccess(session.user, true);
+        await handleAuthSuccess(session.user, session.access_token);
       }
     });
     return () => {
@@ -253,7 +310,12 @@ export default function AuthScreen({ navigation, route }) {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    const redirectUrl = Linking.createURL('google-auth');
+    
+    // Generate the most reliable redirect URI for this exact environment (Expo Go vs Dev Build vs Prod)
+    // Omit explicit scheme so Expo handles it appropriately for the environment.
+    const redirectUrl = makeRedirectUri({
+      path: 'google-auth'
+    });
 
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -267,50 +329,29 @@ export default function AuthScreen({ navigation, route }) {
       if (error) throw error;
       if (!data?.url) throw new Error('No OAuth URL returned from Supabase');
 
-      console.log('[GoogleAuth] Opening browser for OAuth...');
-
-      // Track whether we've already handled the redirect to avoid double-processing
-      let resolved = false;
-
-      // PRIMARY handler for Android: when Android brings the app to the
-      // foreground via a jinni:// deep link, Linking fires this event.
-      // This fires even while openAuthSessionAsync is still awaiting.
-      const linkSub = Linking.addEventListener('url', async ({ url }) => {
-        if (url && url.includes('google-auth') && !resolved) {
-          resolved = true;
-          linkSub.remove();
-          console.log('[GoogleAuth] Deep link caught via Linking:', url.substring(0, 80));
-          WebBrowser.dismissBrowser(); // Close the stuck browser on Android
-          await parseAndSetSession(url);
-        }
-      });
-
-      // openAuthSessionAsync handles iOS (SFSafariViewController closes automatically)
-      // and Android when the native RedirectActivity IS compiled in.
+      // WebBrowser will automatically close and return type: 'success' when it intercepts a URL starting with redirectUrl.
+      // If the URL isn't configured in Supabase, Supabase will not redirect here, and the browser will stay open.
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-      linkSub.remove(); // Clean up listener when browser closes for any reason
 
-      console.log('[GoogleAuth] Browser result type:', result.type);
-
-      if (!resolved) {
-        if (result.type === 'success' && result.url) {
-          // iOS / properly configured Android: redirect URL captured natively
-          console.log('[GoogleAuth] Redirect captured by openAuthSessionAsync');
-          await parseAndSetSession(result.url);
-        } else {
-          // Last resort: maybe the session was set via onAuthStateChange already
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            console.log('[GoogleAuth] Session found in storage, routing...');
-            await handleAuthSuccess(session.user);
-          } else if (result.type !== 'cancel') {
-            console.log('[GoogleAuth] No session found. Result:', result.type);
-          }
+      if (result.type === 'success' && result.url) {
+        await parseAndSetSession(result.url);
+      } else {
+        // If it was cancelled or dismissed, check if we somehow got a session anyway
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await handleAuthSuccess(session.user, session.access_token);
+        } else if (result.type !== 'cancel') {
+          // If we got dismissed and there's no session, it's almost certainly a Redirect URI issue in Supabase!
+          Alert.alert(
+            'Configuration Required',
+            `Google Auth could not complete. This usually happens if the exact redirect URL is missing from your Supabase Dashboard.\n\nPlease add EXACTLY this URL to Supabase -> Auth -> URL Configuration -> Redirect URLs:\n\n${redirectUrl}\n\n(It can take ~5 minutes to propagate after adding).`,
+            [{ text: 'OK' }]
+          );
         }
       }
     } catch (err) {
       console.error('[GoogleAuth] Error:', err.message);
-      Alert.alert('Google Sign-In Failed', err.message || JSON.stringify(err));
+      Alert.alert('Google Sign-In Failed', err.message);
     } finally {
       setGoogleLoading(false);
     }
@@ -387,15 +428,22 @@ export default function AuthScreen({ navigation, route }) {
             </View>
 
             {/* Email Button */}
-            <TouchableOpacity onPress={handleEmailAuth} activeOpacity={0.85} disabled={loading}>
-              <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                {loading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.ctaText}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            <Pressable 
+              onPress={handleEmailAuth} 
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              disabled={loading}
+            >
+              <Animated.View style={buttonAnimatedStyle}>
+                <LinearGradient colors={[C.orange, C.mango]} style={styles.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  {loading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.ctaText}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
+                  )}
+                </LinearGradient>
+              </Animated.View>
+            </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
