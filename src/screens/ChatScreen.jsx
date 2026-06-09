@@ -391,6 +391,7 @@ export default function ChatScreen({ route, navigation }) {
   // ── Swipe-to-reply ──
   const handleSwipeReply = (msg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     setReplyTo({ id: msg.id, text: msg.text, sender_type: msg.sender_type });
     swipeableRefs.current[msg.id]?.close();
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
@@ -507,6 +508,7 @@ export default function ChatScreen({ route, navigation }) {
             if (now - lastTap < 300) {
               if (isMine) {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
                 setEditingMsg(item);
                 setInputText(item.text);
                 inputRef.current?.focus();
@@ -677,7 +679,10 @@ export default function ChatScreen({ route, navigation }) {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => setReplyTo(null)}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+              setReplyTo(null);
+            }}
             style={styles.replyBarClose}
             activeOpacity={0.7}
           >
@@ -699,7 +704,11 @@ export default function ChatScreen({ route, navigation }) {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => { setEditingMsg(null); setInputText(''); }}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+              setEditingMsg(null); 
+              setInputText(''); 
+            }}
             style={styles.replyBarClose}
             activeOpacity={0.7}
           >
