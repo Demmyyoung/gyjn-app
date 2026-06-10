@@ -169,6 +169,7 @@ function MainTabs() {
         component={isEmployer ? EmployerScreen : SwipeScreen}
         initialParams={params}
         options={{
+          title: isEmployer ? "Roles" : "Discover",
           tabBarIcon: () => <TabIcon emoji="💼" />,
         }}
       />

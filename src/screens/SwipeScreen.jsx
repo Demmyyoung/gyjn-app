@@ -159,9 +159,6 @@ function JobCard({ job, onPress, isTop }) {
           end={{ x: 1, y: 1 }}
           style={styles.cardTop}
         >
-          <View style={styles.matchPill}>
-            <Text style={styles.matchPillText}>{job.match}% match</Text>
-          </View>
           <View style={styles.cardLogoWrap}>
             <View style={styles.cardLogoBox}>
               <Text style={styles.cardLogoEmoji}>{job.emoji}</Text>
@@ -347,52 +344,6 @@ function LoadingPulse() {
   );
 }
 
-function calculateMatchScore(candidate, job) {
-  let score = 0;
-
-  // 1. Category Match (50 points)
-  if (candidate.category && job.category) {
-    if (candidate.category.toLowerCase() === job.category.toLowerCase()) {
-      score += 50;
-    }
-  }
-
-  // 2. Skills Overlap (up to 35 points)
-  if (candidate.skills && candidate.skills.length > 0) {
-    const jobText = [
-      ...(job.tags || []).map(t => t.label),
-      ...(job.reqs || []),
-      job.category || ''
-    ].join(' ').toLowerCase();
-
-    const matched = candidate.skills.filter(skill => {
-      const cleanSkill = skill.toLowerCase().trim();
-      if (!cleanSkill) return false;
-      const escaped = cleanSkill.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const regex = new RegExp('(?:^|[^a-zA-Z0-9_#+])' + escaped + '(?:$|[^a-zA-Z0-9_#+])', 'i');
-      return regex.test(jobText);
-    }).length;
-
-    const total = candidate.skills.length;
-    const skillScore = Math.round((matched / total) * 35);
-    score += skillScore;
-  }
-
-  // 3. Job Type Match (15 points)
-  if (candidate.jobType && job.job_type) {
-    const candidatePref = candidate.jobType.toLowerCase();
-    const jobType = job.job_type.toLowerCase();
-
-    if (candidatePref === jobType) {
-      score += 15;
-    } else if (candidatePref === 'hybrid' || jobType === 'hybrid') {
-      score += 8;
-    }
-  }
-
-  return Math.min(100, Math.max(0, score));
-}
-
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
@@ -415,9 +366,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
     'jobs',
     route.params?.userName,
     route.params?.userRole,
-    route.params?.category,
-    JSON.stringify(route.params?.skills || []),
-    route.params?.jobType
+    route.params?.category
   ];
 
   const { data: serverJobs = [], refetch, isLoading, isFetching } = useQuery({
@@ -445,12 +394,6 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: activeProfile.user_name || route.params?.userName,
-            role: activeProfile.user_role || route.params?.userRole,
-            aboutMe: activeProfile.about_me || route.params?.aboutMe,
-            skills: activeProfile.skills || route.params?.skills,
-            cvUrl: activeProfile.cv_url || route.params?.cvUrl,
-            jobType: activeProfile.job_type || route.params?.jobType,
             category: activeProfile.category || route.params?.category,
           }),
         });
@@ -458,7 +401,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         const data = await response.json();
         return data.jobs || [];
       } catch (err) {
-        console.warn('AI matchmaking failed, falling back to direct Supabase query:', err.message);
+        console.warn('API fetch failed, falling back to direct Supabase query:', err.message);
         const { data, error } = await supabase
           .from('jobs')
           .select('*')
@@ -1137,8 +1080,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       </View>
 
       {/* Detail bottom sheet */}
-      <BottomSheet
-        ref={sheetRef}
+      <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents={showDetail ? "auto" : "none"}>
+        <BottomSheet
+          ref={sheetRef}
         index={-1}
         snapPoints={snapPoints}
         enablePanDownToClose
@@ -1213,6 +1157,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           </TouchableOpacity>
         </BottomSheetScrollView>
       </BottomSheet>
+      </View>
     </View>
   );
 }

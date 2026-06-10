@@ -57,7 +57,7 @@ function OverviewCard({ value, label, subtext }) {
 }
 
 // ─── JobCard ─────────────────────────────────────────────────────────────────
-const JobCard = React.memo(function JobCard({ item }) {
+const JobCard = React.memo(function JobCard({ item, onPress }) {
   const matchCount = item.match_count ?? 0;
   const swipeCount = item.swipe_count ?? 0;
   
@@ -66,7 +66,7 @@ const JobCard = React.memo(function JobCard({ item }) {
   const lightBgColor = item.colors?.[1] || C.peach;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
       {/* Upper row: logo, role title, and status */}
       <View style={styles.cardHeaderRow}>
         <View style={[styles.cardLogoBox, { backgroundColor: lightBgColor }]}>
@@ -115,7 +115,7 @@ const JobCard = React.memo(function JobCard({ item }) {
           </View>
         ) : null}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -134,7 +134,7 @@ function EmptyState({ onPost }) {
 }
 
 // ─── EmployerScreen ──────────────────────────────────────────────────────────
-export default function EmployerScreen({ route }) {
+export default function EmployerScreen({ route, navigation }) {
   const { userName, userRole } = route.params || {};
   const insets = useSafeAreaInsets();
 
@@ -325,7 +325,12 @@ export default function EmployerScreen({ route }) {
   }, [formRole, formSalary, formJobType, formCategory, formRemote, closeSheet, fetchJobs, userName]);
 
   // ── Render helpers ─────────────────────────────────────────────────────────
-  const renderItem = useCallback(({ item }) => <JobCard item={item} />, []);
+  const renderItem = useCallback(({ item }) => (
+    <JobCard 
+      item={item} 
+      onPress={() => navigation.navigate('Matches', { initialSearchQuery: item.role })} 
+    />
+  ), [navigation]);
   const keyExtractor = useCallback((item) => String(item.id ?? item.match_id), []);
 
   const listHeader = useMemo(() => {

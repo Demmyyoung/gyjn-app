@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, RefreshControl, TextInput,
-  ScrollView, Alert, Dimensions,
+  ScrollView, Alert, Dimensions, Animated as RNAnimated,
 } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -222,16 +222,38 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
-  const renderLeftActions = () => {
+  const renderLeftActions = (progress, dragX) => {
     if (!canChat) return null;
+    const scale = dragX.interpolate({
+      inputRange: [0, 20, 60, 100],
+      outputRange: [0.3, 0.5, 1, 1],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [0, 20, 60, 100],
+      outputRange: [0, 0.3, 1, 1],
+      extrapolate: 'clamp',
+    });
     return (
-      <TouchableOpacity
-        style={styles.chatSwipeBtn}
-        activeOpacity={0.8}
-        onPress={handleChatNavigation}
-      >
-        <Text style={styles.chatSwipeText}>Chat 💬</Text>
-      </TouchableOpacity>
+      <View style={{
+        width: 80,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingLeft: 12,
+      }}>
+        <RNAnimated.View style={{
+          transform: [{ scale }],
+          opacity,
+          backgroundColor: 'rgba(255, 107, 44, 0.12)',
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <Text style={{ fontSize: 24, marginTop: -2 }}>💬</Text>
+        </RNAnimated.View>
+      </View>
     );
   };
 
@@ -259,9 +281,12 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         renderLeftActions={renderLeftActions}
         onSwipeableLeftWillOpen={handleChatNavigation}
         onSwipeableRightWillOpen={handleSwipeableRightOpen}
-        friction={1}
-        rightThreshold={40}
-        leftThreshold={40}
+        friction={2}
+        overshootFriction={8}
+        rightThreshold={60}
+        leftThreshold={60}
+        overshootLeft={true}
+        overshootRight={false}
       >
         <MatchCard
           item={item}
@@ -334,10 +359,17 @@ function MatchesSkeleton() {
 }
 
 export default function MatchesScreen({ route, navigation }) {
-  const { userName, userType } = route.params || {};
+  const { userName, userType, initialSearchQuery } = route.params || {};
   const isEmployer = userType === 'employer';
   const insets = useSafeAreaInsets();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
+
+  // Keep search query in sync if we navigate to this tab with new params
+  useEffect(() => {
+    if (initialSearchQuery !== undefined) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
   const [selectedStage, setSelectedStage] = useState('All');
 
   const { data: matches = [], isLoading, isFetching, refetch } = useQuery({

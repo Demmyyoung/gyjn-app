@@ -216,13 +216,51 @@ export default function LoginScreen({ navigation, route }) {
 
         if (parseData.success && parseData.profile) {
           const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills, category: parsedCategory } = parseData.profile;
-          if (parsedName) setName(parsedName);
-          if (parsedRole) setRole(parsedRole);
-          if (parsedAbout) setAboutMe(parsedAbout);
-          if (Array.isArray(parsedSkills)) setSelectedSkills(parsedSkills);
-          if (parsedCategory) setCategory(parsedCategory);
+          
+          // Stop the "reading" pulse animation immediately
+          setAiParsing(false);
 
-          Alert.alert('Genie Auto-Filled! ✨', 'Your profile details have been successfully extracted from your CV.');
+          const typeText = (fullText, setter, delay = 25) => {
+            return new Promise((resolve) => {
+              if (!fullText) return resolve();
+              const parts = fullText.split(/(\s+)/);
+              let i = -1;
+              let currentString = '';
+              const interval = setInterval(() => {
+                i++;
+                if (i < parts.length) {
+                  currentString += parts[i];
+                  setter(currentString);
+                } else {
+                  clearInterval(interval);
+                  resolve();
+                }
+              }, delay);
+            });
+          };
+
+          // Sequence the animations asynchronously so it doesn't block
+          (async () => {
+            if (parsedCategory) setCategory(parsedCategory);
+            
+            if (parsedName) await typeText(parsedName, setName, 20);
+            if (parsedRole) await typeText(parsedRole, setRole, 20);
+            if (parsedAbout) await typeText(parsedAbout, setAboutMe, 20);
+            
+            if (Array.isArray(parsedSkills)) {
+              for (const skill of parsedSkills) {
+                setSelectedSkills(prev => {
+                  if (!prev.includes(skill)) return [...prev, skill];
+                  return prev;
+                });
+                await new Promise(r => setTimeout(r, 80));
+              }
+            }
+
+            Alert.alert('Genie Auto-Filled! ✨', 'Your profile details have been magically extracted from your CV.');
+          })();
+          
+          return; // Skip the finally block since we already stopped aiParsing
         }
       } catch (parseErr) {
         console.warn('CV Auto-fill failed:', parseErr);
@@ -230,7 +268,6 @@ export default function LoginScreen({ navigation, route }) {
           'Auto-fill Unavailable',
           'Genie was unable to parse your CV automatically, but your file has been uploaded. Please fill in your profile details manually.'
         );
-      } finally {
         setAiParsing(false);
       }
     } catch (err) {
