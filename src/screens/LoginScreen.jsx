@@ -99,7 +99,8 @@ import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, w
 
 export default function LoginScreen({ navigation, route }) {
   const [name, setName]               = useState('');
-  const [role, setRole]               = useState(route.params?.role === 'employer' ? 'Employer' : '');
+  const [role, setRole]               = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [aboutMe, setAboutMe]         = useState('');
   const [jobType, setJobType]         = useState('Full-time');
   const [searchTarget, setSearchTarget] = useState('');
@@ -298,6 +299,7 @@ export default function LoginScreen({ navigation, route }) {
         skills:        selectedSkills.length > 0 ? selectedSkills : ['JavaScript', 'React', 'Figma'],
         cv_url:        cvUrl ?? null,
         category:      isEmployer ? null : category,
+        ...(isEmployer && { company_name: companyName.trim() })
       };
 
       const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
@@ -416,13 +418,13 @@ export default function LoginScreen({ navigation, route }) {
             </Animated.View>
           </View>
 
-          {/* Role / Company */}
+          {/* Role */}
           <View style={styles.group}>
-            <Text style={styles.label}>{isEmployer ? "COMPANY NAME" : "CURRENT ROLE"}</Text>
+            <Text style={styles.label}>YOUR ROLE</Text>
             <Animated.View style={aiParsing && animatedPulseStyle}>
               <TextInput
                 style={[styles.input, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
-                placeholder={aiParsing ? "Genie is extracting role..." : (isEmployer ? "e.g. Acme Inc" : "e.g. UX Designer")}
+                placeholder={aiParsing ? "Genie is extracting role..." : (isEmployer ? "e.g. Lead Recruiter" : "e.g. UX Designer")}
                 placeholderTextColor={aiParsing ? C.orange : "#ABABAB"}
                 value={role}
                 onChangeText={setRole}
@@ -431,6 +433,21 @@ export default function LoginScreen({ navigation, route }) {
               />
             </Animated.View>
           </View>
+
+          {/* Company Name (Employers only) */}
+          {isEmployer && (
+            <View style={styles.group}>
+              <Text style={styles.label}>COMPANY NAME</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Jinni Technologies"
+                placeholderTextColor="#ABABAB"
+                value={companyName}
+                onChangeText={setCompanyName}
+                autoCorrect={false}
+              />
+            </View>
+          )}
 
           {/* About */}
           <View style={styles.group}>
