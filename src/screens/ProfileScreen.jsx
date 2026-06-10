@@ -135,6 +135,7 @@ export default function ProfileScreen({ route, navigation }) {
     jobType: jobType,
     skills:  defaultSkills,
     category: initialCategory,
+    companyName: route.params?.companyName || '',
   });
 
   // CV state
@@ -175,6 +176,7 @@ export default function ProfileScreen({ route, navigation }) {
             jobType:  dbProfile.job_type || jobType,
             skills:   dbProfile.skills || defaultSkills,
             category: dbProfile.category || initialCategory,
+            companyName: dbProfile.company_name || '',
           });
           setCvUrl(dbProfile.cv_url);
           if (dbProfile.cv_url) {
@@ -295,6 +297,7 @@ export default function ProfileScreen({ route, navigation }) {
             category:      draft.category,
             job_type:      draft.jobType,
             cv_url:        cvUrl,
+            ...(isEmployer && { company_name: draft.companyName }),
           });
         if (error) {
           Alert.alert('Error updating profile', error.message);
@@ -478,7 +481,7 @@ export default function ProfileScreen({ route, navigation }) {
             </Text>
           </View>
           <Text style={styles.pName}>{profile.name}</Text>
-          <Text style={styles.pRole}>{profile.role} {isEmployer ? '' : `· ${profile.category}`}</Text>
+          <Text style={styles.pRole}>{profile.role} {isEmployer ? (profile.companyName ? `at ${profile.companyName}` : '') : `· ${profile.category}`}</Text>
           {profile.about ? (
             <Text style={styles.pBio} numberOfLines={2}>{profile.about}</Text>
           ) : null}
@@ -608,6 +611,23 @@ export default function ProfileScreen({ route, navigation }) {
                   />
                 </Animated.View>
               </View>
+
+              {/* Company Name (Employers Only) */}
+              {isEmployer && (
+                <View style={styles.group}>
+                  <Text style={styles.fieldLabel}>COMPANY NAME</Text>
+                  <Animated.View style={aiParsing && animatedPulseStyle}>
+                    <TextInput
+                      style={[styles.fieldInput, aiParsing && { backgroundColor: '#FFF5EE', borderColor: C.orange }]}
+                      value={draft.companyName}
+                      onChangeText={v => setDraft(p => ({ ...p, companyName: v }))}
+                      placeholder={aiParsing ? "Genie is extracting..." : "e.g. Jinni Technologies"}
+                      placeholderTextColor={aiParsing ? C.orange : C.hint}
+                      editable={!aiParsing}
+                    />
+                  </Animated.View>
+                </View>
+              )}
 
               {/* Role */}
               <View style={styles.group}>
