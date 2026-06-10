@@ -189,9 +189,13 @@ export default function EmployerScreen({ route, navigation }) {
     else setLoading(true);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
+        .eq('employer_id', user.id)
         .order('created_at', { ascending: false });
 
       if (jobsError) throw jobsError;
@@ -292,7 +296,10 @@ export default function EmployerScreen({ route, navigation }) {
       }
 
       // 3. Insert fully enriched role payload
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { error } = await supabase.from('jobs').insert({
+        employer_id: user?.id,
         role:       formRole.trim(),
         company:    userName || 'My Company',
         salary:     finalSalary,
