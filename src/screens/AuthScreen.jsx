@@ -11,6 +11,7 @@ import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -31,6 +32,14 @@ export default function AuthScreen({ navigation, route }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [lastUsed, setLastUsed] = useState(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('lastLoginMethod').then(method => {
+      if (method) setLastUsed(method);
+    });
+  }, []);
 
   const buttonScale = useSharedValue(1);
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
@@ -209,7 +218,7 @@ export default function AuthScreen({ navigation, route }) {
     const handleDeepLink = (event) => {
       const url = typeof event === 'string' ? event : event?.url;
       console.log('Intercepted deep link event URL:', url);
-      if (url && (url.includes('jinni://') || url.includes('google-auth') || url.includes('--/google-auth'))) {
+      if (url && (url.includes('jinni://') || url.includes('google-auth') || url.includes('--/google-auth') || url.includes('linkedin-auth') || url.includes('--/linkedin-auth'))) {
         parseAndSetSession(url);
       }
     };
@@ -290,6 +299,7 @@ export default function AuthScreen({ navigation, route }) {
         Alert.alert('Sign Up Error', error.message);
       } else {
         if (data?.session) {
+          AsyncStorage.setItem('lastLoginMethod', 'email');
           // Signed in immediately! Auth listener handles routing.
         } else {
           Alert.alert('Sign Up Successful!', 'Check your email inbox to verify your account if email confirmation is enabled.');
@@ -303,6 +313,8 @@ export default function AuthScreen({ navigation, route }) {
 
       if (error) {
         Alert.alert('Login Error', error.message);
+      } else {
+        AsyncStorage.setItem('lastLoginMethod', 'email');
       }
     }
     setLoading(false);
@@ -310,6 +322,7 @@ export default function AuthScreen({ navigation, route }) {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    await AsyncStorage.setItem('lastLoginMethod', 'google');
     
     // Generate the most reliable redirect URI for this exact environment (Expo Go vs Dev Build vs Prod)
     // Omit explicit scheme so Expo handles it appropriately for the environment.
@@ -354,6 +367,50 @@ export default function AuthScreen({ navigation, route }) {
       Alert.alert('Google Sign-In Failed', err.message);
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleLinkedInSignIn = async () => {
+    setLinkedinLoading(true);
+    await AsyncStorage.setItem('lastLoginMethod', 'linkedin');
+    
+    const redirectUrl = makeRedirectUri({
+      path: 'linkedin-auth'
+    });
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'linkedin_oidc',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.url) throw new Error('No OAuth URL returned from Supabase');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+      if (result.type === 'success' && result.url) {
+        await parseAndSetSession(result.url);
+      } else {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await handleAuthSuccess(session.user, session.access_token);
+        } else if (result.type !== 'cancel') {
+          Alert.alert(
+            'Configuration Required',
+            `LinkedIn Auth could not complete. Please add exactly this URL to Supabase -> Auth -> Redirect URLs:\n\n${redirectUrl}`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[LinkedInAuth] Error:', err.message);
+      Alert.alert('LinkedIn Sign-In Failed', err.message);
+    } finally {
+      setLinkedinLoading(false);
     }
   };
 
@@ -441,6 +498,11 @@ export default function AuthScreen({ navigation, route }) {
                   ) : (
                     <Text style={styles.ctaText}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
                   )}
+                  {lastUsed === 'email' && (
+                    <View style={styles.lastUsedBadgeAbs}>
+                      <Text style={styles.lastUsedTextAbs}>Last used</Text>
+                    </View>
+                  )}
                 </LinearGradient>
               </Animated.View>
             </Pressable>
@@ -451,14 +513,34 @@ export default function AuthScreen({ navigation, route }) {
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Google Button */}
-            <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn} activeOpacity={0.8} disabled={googleLoading}>
+            <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn} activeOpacity={0.8} disabled={googleLoading || linkedinLoading}>
               {googleLoading ? (
                 <ActivityIndicator color={C.night} size="small" />
               ) : (
                 <>
                   <Text style={styles.socialIcon}>G</Text>
                   <Text style={styles.socialText}>Google</Text>
+                  {lastUsed === 'google' && (
+                    <View style={styles.lastUsedBadgeAbsSocial}>
+                      <Text style={styles.lastUsedTextAbsSocial}>Last used</Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.socialBtn} onPress={handleLinkedInSignIn} activeOpacity={0.8} disabled={googleLoading || linkedinLoading}>
+              {linkedinLoading ? (
+                <ActivityIndicator color="#0A66C2" size="small" />
+              ) : (
+                <>
+                  <Text style={[styles.socialIcon, { color: '#0A66C2' }]}>in</Text>
+                  <Text style={styles.socialText}>LinkedIn</Text>
+                  {lastUsed === 'linkedin' && (
+                    <View style={styles.lastUsedBadgeAbsSocial}>
+                      <Text style={styles.lastUsedTextAbsSocial}>Last used</Text>
+                    </View>
+                  )}
                 </>
               )}
             </TouchableOpacity>
@@ -574,10 +656,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.06)',
     paddingVertical: 14,
     gap: 12,
+    position: 'relative',
   },
-  socialIcon: { fontSize: 18, fontWeight: '800', color: C.night },
+  socialIcon: { fontSize: 18, fontWeight: '900', color: C.night },
   socialText: { fontSize: 15, fontWeight: '700', color: C.night },
 
   toggleBtn: { paddingVertical: 10 },
   toggleText: { fontSize: 14, color: C.orange, fontWeight: '600', textAlign: 'center' },
+
+  lastUsedBadgeAbs: {
+    position: 'absolute', right: 16, top: '50%', transform: [{ translateY: -10 }],
+    backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4
+  },
+  lastUsedTextAbs: { color: '#fff', fontSize: 10, fontWeight: '700' },
+
+  lastUsedBadgeAbsSocial: {
+    position: 'absolute', right: 16, top: '50%', transform: [{ translateY: -10 }],
+    backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4
+  },
+  lastUsedTextAbsSocial: { color: C.hint, fontSize: 10, fontWeight: '700' },
 });
