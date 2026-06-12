@@ -143,6 +143,15 @@ export default function ProfileScreen({ route, navigation }) {
   const [cvName, setCvName]           = useState(initialCvName);
   const [cvUploading, setCvUploading] = useState(false);
   const [aiParsing, setAiParsing]     = useState(false);
+
+  // CV Review Modal state
+  const [showCvReview, setShowCvReview] = useState(false);
+  const [cvChanges, setCvChanges]       = useState(null); // { name, role, about, skills, category }
+  const [acceptedFields, setAcceptedFields] = useState({
+    name: true, role: true, about: true, skills: true, category: true,
+  });
+  const [revealedFields, setRevealedFields] = useState({});
+  const reviewTranslateY = useSharedValue(SCREEN_H);
   const [skillInput, setSkillInput]   = useState('');
   const [userEmail, setUserEmail]     = useState('');
 
@@ -281,6 +290,112 @@ export default function ProfileScreen({ route, navigation }) {
     setDraft({ ...profile });
     setEditing(true);
   };
+
+  // Animated styles for CV review modal
+  const reviewSheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reviewTranslateY.value }],
+  }));
+  const reviewBgStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(reviewTranslateY.value, [0, SCREEN_H * 0.5], [1, 0], 'clamp');
+    return { opacity };
+  });
+
+  const closeCvReview = useCallback(() => {
+    reviewTranslateY.value = withTiming(SCREEN_H, { duration: 250 }, (finished) => {
+      if (finished) {
+        runOnJS(setShowCvReview)(false);
+      }
+    });
+  }, [reviewTranslateY]);
+
+  const toggleField = (field) => {
+    setAcceptedFields(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const applyCvChanges = async () => {
+    if (!cvChanges) return;
+    const updates = {};
+    if (acceptedFields.name && cvChanges.name) updates.name = cvChanges.name;
+    if (acceptedFields.role && cvChanges.role) updates.role = cvChanges.role;
+    if (acceptedFields.about && cvChanges.about) updates.about = cvChanges.about;
+    if (acceptedFields.skills && cvChanges.skills) updates.skills = cvChanges.skills;
+    if (acceptedFields.category && cvChanges.category) updates.category = cvChanges.category;
+
+    // Apply to draft
+    setDraft(prev => ({ ...prev, ...updates }));
+    // Also apply to live profile immediately
+    setProfile(prev => ({ ...prev, ...updates }));
+
+    // Save to Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
+        const dbUpdates = {};
+        if (updates.name) dbUpdates.user_name = updates.name;
+        if (updates.role) dbUpdates.user_role = updates.role;
+        if (updates.about) dbUpdates.about_me = updates.about;
+        if (updates.skills) dbUpdates.skills = updates.skills;
+        if (updates.category) dbUpdates.category = updates.category;
+        dbUpdates.cv_url = cvUrl;
+
+        await supabase.from(tableName).upsert({ id: user.id, ...dbUpdates });
+
+        // Sync changes to ALL existing matches for this candidate
+        const candidateName = updates.name || profile.name;
+        const { data: existingMatches } = await supabase
+          .from('matches')
+          .select('match_id')
+          .eq('candidate_name', candidateName);
+
+        // Also check old name if it changed
+        if (updates.name && updates.name !== profile.name) {
+          const { data: oldMatches } = await supabase
+            .from('matches')
+            .select('match_id')
+            .eq('candidate_name', profile.name);
+          if (oldMatches) {
+            existingMatches?.push(...oldMatches);
+          }
+        }
+
+        if (existingMatches && existingMatches.length > 0) {
+          const matchUpdates = {
+            candidate_role: updates.role || profile.role,
+            skills: updates.skills || profile.skills,
+            category: updates.category || profile.category,
+            about_me: updates.about || profile.about,
+            cv_url: cvUrl,
+            updated_at: new Date().toISOString(),
+          };
+          if (updates.name) matchUpdates.candidate_name = updates.name;
+
+          for (const m of existingMatches) {
+            await supabase.from('matches').update(matchUpdates).eq('match_id', m.match_id);
+            // Trigger score recalculation
+            fetch(`${getBackendUrl()}/api/recalculate-match`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ match_id: m.match_id }),
+            }).catch(err => console.warn('[recalculate-match]', err));
+          }
+        }
+
+        // Sync route params
+        navigation.getParent()?.setParams({
+          userName: updates.name || profile.name,
+          userRole: updates.role || profile.role,
+          aboutMe: updates.about || profile.about,
+          skills: updates.skills || profile.skills,
+          category: updates.category || profile.category,
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to sync CV changes:', err);
+    }
+
+    closeCvReview();
+  };
   const saveEdit = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -382,16 +497,19 @@ export default function ProfileScreen({ route, navigation }) {
         if (parseData.success && parseData.profile) {
           const { name: parsedName, role: parsedRole, aboutMe: parsedAbout, skills: parsedSkills, category: parsedCategory } = parseData.profile;
 
-          setDraft(prev => ({
-            ...prev,
-            name: parsedName || prev.name,
-            role: parsedRole || prev.role,
-            about: parsedAbout || prev.about,
-            skills: Array.isArray(parsedSkills) ? parsedSkills : prev.skills,
-            category: parsedCategory || prev.category,
-          }));
-
-          Alert.alert('Genie Auto-Filled! ✨', 'Your draft profile details have been updated from your CV.');
+          // Store changes for review modal instead of auto-applying
+          setCvChanges({
+            name: parsedName || null,
+            role: parsedRole || null,
+            about: parsedAbout || null,
+            skills: Array.isArray(parsedSkills) ? parsedSkills : null,
+            category: parsedCategory || null,
+          });
+          setAcceptedFields({ name: true, role: true, about: true, skills: true, category: true });
+          setRevealedFields({});
+          setShowCvReview(true);
+          reviewTranslateY.value = SCREEN_H;
+          reviewTranslateY.value = withTiming(0, { duration: 350 });
         }
       } catch (parseErr) {
         console.warn('CV Auto-fill failed:', parseErr);
@@ -540,21 +658,49 @@ export default function ProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>CV / RESUME</Text>
           {cvUrl ? (
-            <View style={styles.cvRow}>
-              <Text style={styles.cvIcon}>📄</Text>
-              <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'My CV'}</Text>
-              <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtn}>
-                <Text style={styles.cvDeleteText}>✕</Text>
+            <View>
+              <View style={styles.cvRow}>
+                <Text style={styles.cvIcon}>📄</Text>
+                <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'My CV'}</Text>
+                <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtn}>
+                  <Text style={styles.cvDeleteText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity 
+                onPress={pickAndUploadCV} 
+                disabled={cvUploading || aiParsing}
+                style={{ 
+                  marginTop: 10, 
+                  backgroundColor: 'rgba(255,107,44,0.08)', 
+                  paddingVertical: 12, 
+                  paddingHorizontal: 16,
+                  borderRadius: 12, 
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,107,44,0.15)'
+                }}
+              >
+                {cvUploading || aiParsing ? (
+                  <ActivityIndicator size="small" color={C.orange} />
+                ) : (
+                  <Text style={{ fontSize: 14 }}>✨</Text>
+                )}
+                <Text style={{ color: C.orange, fontWeight: '700', fontSize: 13 }}>
+                  {aiParsing ? 'Genie is updating your profile...' : 'Upload newer CV to sync profile'}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={styles.cvUploadBox} onPress={pickAndUploadCV} disabled={cvUploading}>
-              {cvUploading
+            <TouchableOpacity style={styles.cvUploadBox} onPress={pickAndUploadCV} disabled={cvUploading || aiParsing}>
+              {cvUploading || aiParsing
                 ? <ActivityIndicator color={C.orange} size="small" />
                 : <>
                     <Text style={styles.cvBoxIcon}>📄</Text>
                     <Text style={styles.cvBoxText}>Upload CV</Text>
-                    <Text style={styles.cvBoxSub}>Tap ✎ to add one</Text>
+                    <Text style={styles.cvBoxSub}>Tap here to auto-fill profile</Text>
                   </>
               }
             </TouchableOpacity>
@@ -817,6 +963,126 @@ export default function ProfileScreen({ route, navigation }) {
                   <Text style={styles.saveCtaText}>Save Changes</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── CV Changes Review Modal ── */}
+      <Modal visible={showCvReview} transparent animationType="none" statusBarTranslucent={true}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeCvReview}>
+          <Animated.View style={[styles.sheetBg, reviewBgStyle]} />
+        </Pressable>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="box-none"
+        >
+          <Animated.View style={[styles.reviewSheet, reviewSheetStyle]}>
+            <View style={styles.sheetHandle} />
+
+            {/* Header */}
+            <View style={styles.reviewHeader}>
+              <View style={styles.reviewHeaderLeft}>
+                <Text style={styles.reviewEmoji}>🧞‍♂️</Text>
+                <View>
+                  <Text style={styles.reviewTitle}>Profile Update</Text>
+                  <Text style={styles.reviewSub}>Genie extracted these from your CV</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={closeCvReview}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: C.muted }}>Skip</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, gap: 12 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {cvChanges && [
+                { key: 'name', label: 'Full Name', icon: '👤', current: profile.name, suggested: cvChanges.name },
+                { key: 'role', label: 'Professional Title', icon: '💼', current: profile.role, suggested: cvChanges.role },
+                { key: 'about', label: 'About You', icon: '📝', current: profile.about, suggested: cvChanges.about },
+                { key: 'category', label: 'Category', icon: '🏷️', current: profile.category, suggested: cvChanges.category },
+                { key: 'skills', label: 'Skills', icon: '⚡', current: profile.skills?.join(', '), suggested: cvChanges.skills?.join(', ') },
+              ].filter(f => f.suggested && f.suggested !== f.current).map((field, idx) => {
+                const accepted = acceptedFields[field.key];
+                const hasChanged = field.suggested !== field.current;
+                return (
+                  <TouchableOpacity
+                    key={field.key}
+                    activeOpacity={0.85}
+                    onPress={() => toggleField(field.key)}
+                    style={[
+                      styles.reviewCard,
+                      accepted && styles.reviewCardActive,
+                      !hasChanged && { opacity: 0.5 },
+                    ]}
+                  >
+                    {/* Toggle indicator */}
+                    <View style={[styles.reviewToggle, accepted && styles.reviewToggleActive]}>
+                      {accepted && <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>✓</Text>}
+                    </View>
+
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 13 }}>{field.icon}</Text>
+                        <Text style={styles.reviewFieldLabel}>{field.label}</Text>
+                      </View>
+
+                      {/* Current value (strikethrough) */}
+                      {field.current ? (
+                        <Text style={styles.reviewOldValue} numberOfLines={2}>
+                          {field.current}
+                        </Text>
+                      ) : null}
+
+                      {/* New value (highlighted) */}
+                      <Text style={[
+                        styles.reviewNewValue,
+                        accepted && { color: '#06b6d4' },
+                      ]} numberOfLines={field.key === 'about' ? 4 : 2}>
+                        {field.suggested}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Action buttons */}
+              <View style={{ gap: 10, marginTop: 8 }}>
+                <TouchableOpacity onPress={applyCvChanges} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={['#06b6d4', '#0891b2']}
+                    style={styles.reviewAcceptBtn}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.reviewAcceptText}>Accept Selected Changes ✓</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    // Apply to draft only and open edit modal
+                    if (cvChanges) {
+                      setDraft(prev => ({
+                        ...prev,
+                        ...(acceptedFields.name && cvChanges.name ? { name: cvChanges.name } : {}),
+                        ...(acceptedFields.role && cvChanges.role ? { role: cvChanges.role } : {}),
+                        ...(acceptedFields.about && cvChanges.about ? { about: cvChanges.about } : {}),
+                        ...(acceptedFields.skills && cvChanges.skills ? { skills: cvChanges.skills } : {}),
+                        ...(acceptedFields.category && cvChanges.category ? { category: cvChanges.category } : {}),
+                      }));
+                    }
+                    closeCvReview();
+                    setTimeout(() => setEditing(true), 400);
+                  }}
+                  activeOpacity={0.85}
+                  style={styles.reviewEditBtn}
+                >
+                  <Text style={styles.reviewEditText}>Review & Edit Manually ✎</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
@@ -1148,5 +1414,107 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 12,
     marginBottom: 16,
+  },
+
+  // CV Review Modal
+  reviewSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: SCREEN_H * 0.88,
+    shadowColor: C.night,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 24,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  reviewHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reviewEmoji: { fontSize: 28 },
+  reviewTitle: { fontSize: 18, fontWeight: '800', color: C.night, letterSpacing: -0.3 },
+  reviewSub: { fontSize: 11, fontWeight: '500', color: C.muted, marginTop: 1 },
+  reviewCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#F8FFFE',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  reviewCardActive: {
+    borderColor: '#06b6d4',
+    backgroundColor: '#F0FDFA',
+  },
+  reviewToggle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'rgba(0,0,0,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  reviewToggleActive: {
+    backgroundColor: '#06b6d4',
+    borderColor: '#06b6d4',
+  },
+  reviewFieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reviewOldValue: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+    fontStyle: 'italic',
+  },
+  reviewNewValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.night,
+    lineHeight: 20,
+  },
+  reviewAcceptBtn: {
+    borderRadius: 18,
+    paddingVertical: 17,
+    alignItems: 'center',
+  },
+  reviewAcceptText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reviewEditBtn: {
+    borderRadius: 18,
+    paddingVertical: 15,
+    alignItems: 'center',
+    backgroundColor: 'rgba(6,182,212,0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(6,182,212,0.2)',
+  },
+  reviewEditText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#06b6d4',
   },
 });

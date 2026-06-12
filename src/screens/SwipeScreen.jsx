@@ -899,13 +899,34 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           }
 
           // Trigger detailed AI analysis in the background immediately
-          fetch(`${getBackendUrl()}/api/analyze-match`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              record: data
-            })
-          }).catch(err => console.warn('[analyzeMatch trigger failed]', err));
+          const triggerAnalysis = async (retries = 2) => {
+            for (let attempt = 0; attempt <= retries; attempt++) {
+              try {
+                const analyzeRes = await fetch(`${getBackendUrl()}/api/analyze-match`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ record: data }),
+                });
+                if (!analyzeRes.ok) {
+                  const errBody = await analyzeRes.text();
+                  console.warn(`[analyzeMatch] Attempt ${attempt + 1} failed (${analyzeRes.status}):`, errBody);
+                  if (attempt < retries) {
+                    await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+                    continue;
+                  }
+                } else {
+                  console.log('[analyzeMatch] Success for match:', data.match_id);
+                  return;
+                }
+              } catch (err) {
+                console.warn(`[analyzeMatch] Attempt ${attempt + 1} network error:`, err);
+                if (attempt < retries) {
+                  await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+                }
+              }
+            }
+          };
+          triggerAnalysis();
         } catch (err) {
           console.warn('Failed to save match to database:', err);
         }
