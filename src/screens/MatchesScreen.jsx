@@ -248,12 +248,22 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
 
     const scale = dragX.interpolate({
       inputRange: [0, 40, 70],
-      outputRange: [0.5, 0.8, 1.1],
+      outputRange: [0.5, 0.8, 1.2],
       extrapolate: 'clamp',
     });
     const opacity = dragX.interpolate({
       inputRange: [0, 40, 70],
       outputRange: [0, 0.6, 1],
+      extrapolate: 'clamp',
+    });
+    const rotate = dragX.interpolate({
+      inputRange: [0, 70],
+      outputRange: ['0deg', '360deg'],
+      extrapolate: 'clamp',
+    });
+    const translateX = dragX.interpolate({
+      inputRange: [0, 70],
+      outputRange: [-20, 0],
       extrapolate: 'clamp',
     });
 
@@ -265,17 +275,26 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         paddingLeft: 12,
       }}>
         <RNAnimated.View style={{
-          transform: [{ scale }],
+          transform: [{ scale }, { translateX }],
           opacity,
           justifyContent: 'center',
           alignItems: 'center',
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: 48,
+          height: 48,
+          borderRadius: 24,
           backgroundColor: 'rgba(255, 107, 44, 0.12)',
-          borderWidth: 2,
-          borderColor: C.orange,
         }}>
+          {/* Rotating dashed border */}
+          <RNAnimated.View style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderRadius: 24,
+            borderWidth: 2,
+            borderColor: C.orange,
+            borderStyle: 'dashed',
+            transform: [{ rotate }]
+          }} />
           <Feather name="message-circle" size={20} color={C.orange} />
         </RNAnimated.View>
       </View>
@@ -307,7 +326,7 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         ref={swipeableRef}
         renderRightActions={renderRightActions}
         renderLeftActions={renderLeftActions}
-        onSwipeableLeftOpen={handleChatNavigation}
+        onSwipeableLeftWillOpen={handleChatNavigation}
         onSwipeableRightWillOpen={handleSwipeableRightOpen}
         friction={2}
         overshootFriction={8}
