@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Pressable
+  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Pressable, ScrollView
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -48,10 +48,10 @@ export default function AuthScreen({ navigation, route }) {
 
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    buttonScale.value = withSpring(0.96, { damping: 10, stiffness: 400 });
+    buttonScale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
   };
   const handlePressOut = () => {
-    buttonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
+    buttonScale.value = withSpring(1, { damping: 15, stiffness: 300 });
   };
 
   // With implicit flow, Supabase returns tokens directly in the URL hash.
@@ -420,7 +420,7 @@ export default function AuthScreen({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {/* Logo / Branding */}
           <View style={styles.logoContainer}>
             <LinearGradient
@@ -513,7 +513,14 @@ export default function AuthScreen({ navigation, route }) {
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleSignIn} activeOpacity={0.8} disabled={googleLoading || linkedinLoading}>
+            <Pressable 
+              onPress={handleGoogleSignIn} 
+              disabled={googleLoading || linkedinLoading}
+              style={({ pressed }) => [
+                styles.socialBtn,
+                pressed && styles.socialBtnPressed
+              ]}
+            >
               {googleLoading ? (
                 <ActivityIndicator color={C.night} size="small" />
               ) : (
@@ -527,9 +534,16 @@ export default function AuthScreen({ navigation, route }) {
                   )}
                 </>
               )}
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity style={styles.socialBtn} onPress={handleLinkedInSignIn} activeOpacity={0.8} disabled={googleLoading || linkedinLoading}>
+            <Pressable 
+              onPress={handleLinkedInSignIn} 
+              disabled={googleLoading || linkedinLoading}
+              style={({ pressed }) => [
+                styles.socialBtn,
+                pressed && styles.socialBtnPressed
+              ]}
+            >
               {linkedinLoading ? (
                 <ActivityIndicator color="#0A66C2" size="small" />
               ) : (
@@ -543,16 +557,19 @@ export default function AuthScreen({ navigation, route }) {
                   )}
                 </>
               )}
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           {/* Toggle */}
-          <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)} style={styles.toggleBtn}>
+          <Pressable 
+            onPress={() => setIsSignUp(!isSignUp)} 
+            style={({ pressed }) => [styles.toggleBtn, pressed && { opacity: 0.6 }]}
+          >
             <Text style={styles.toggleText}>
               {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
             </Text>
-          </TouchableOpacity>
-        </View>
+          </Pressable>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -560,7 +577,7 @@ export default function AuthScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.cream },
-  content: { flex: 1, paddingHorizontal: 28, justifyContent: 'center', gap: 40 },
+  content: { flexGrow: 1, paddingHorizontal: 28, paddingVertical: 40, justifyContent: 'center', gap: 40 },
   logoContainer: { alignItems: 'center', gap: 8 },
   logoBadge: {
     width: 72, height: 72,
@@ -657,6 +674,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
     position: 'relative',
+  },
+  socialBtnPressed: {
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   socialIcon: { fontSize: 18, fontWeight: '900', color: C.night },
   socialText: { fontSize: 15, fontWeight: '700', color: C.night },
