@@ -247,20 +247,13 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
     }
 
     const scale = dragX.interpolate({
-      inputRange: [0, 20, 50, 100],
-      outputRange: [0.3, 0.5, 1, 1],
+      inputRange: [0, 40, 70],
+      outputRange: [0.5, 0.8, 1.1],
       extrapolate: 'clamp',
     });
     const opacity = dragX.interpolate({
-      inputRange: [0, 20, 50, 100],
-      outputRange: [0, 0.3, 1, 1],
-      extrapolate: 'clamp',
-    });
-
-    const CIRCUMFERENCE = 2 * Math.PI * 20; // r=20
-    const strokeDashoffset = dragX.interpolate({
-      inputRange: [20, 70],
-      outputRange: [CIRCUMFERENCE, 0],
+      inputRange: [0, 40, 70],
+      outputRange: [0, 0.6, 1],
       extrapolate: 'clamp',
     });
 
@@ -276,23 +269,14 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
           opacity,
           justifyContent: 'center',
           alignItems: 'center',
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: 'rgba(255, 107, 44, 0.12)',
+          borderWidth: 2,
+          borderColor: C.orange,
         }}>
-          <Svg width={48} height={48} style={{ position: 'absolute' }}>
-            <Circle cx={24} cy={24} r={20} stroke="rgba(255, 107, 44, 0.15)" strokeWidth={2.5} fill="rgba(255, 107, 44, 0.08)" />
-            <AnimatedCircle
-              cx={24} cy={24} r={20}
-              stroke={C.orange}
-              strokeWidth={2.5}
-              fill="none"
-              strokeDasharray={CIRCUMFERENCE}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              transform="rotate(-90 24 24)"
-            />
-          </Svg>
-          <Feather name="corner-up-left" size={20} color={C.orange} style={{ position: 'absolute' }} />
+          <Feather name="message-circle" size={20} color={C.orange} />
         </RNAnimated.View>
       </View>
     );

@@ -37,9 +37,11 @@ const queryClient = new QueryClient({
 // ── Tab Navigator ─────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
+import { Feather } from '@expo/vector-icons';
+
 // Custom tab bar icon component
-function TabIcon({ emoji }) {
-  return <Text style={{ fontSize: 22 }}>{emoji}</Text>;
+function TabIcon({ name, focused }) {
+  return <Feather name={name} size={22} color={focused ? '#FF6B2C' : '#ABABAB'} />;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -170,7 +172,7 @@ function MainTabs() {
         initialParams={params}
         options={{
           title: isEmployer ? "Roles" : "Discover",
-          tabBarIcon: () => <TabIcon emoji="💼" />,
+          tabBarIcon: ({ focused }) => <TabIcon name="compass" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -179,7 +181,7 @@ function MainTabs() {
         initialParams={params}
         options={{
           title: isEmployer ? "Applicants" : "Applied",
-          tabBarIcon: () => <TabIcon emoji="💬" />,
+          tabBarIcon: ({ focused }) => <TabIcon name="message-circle" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -187,7 +189,7 @@ function MainTabs() {
         component={ProfileScreen}
         initialParams={params}
         options={{
-          tabBarIcon: () => <TabIcon emoji="👤" />,
+          tabBarIcon: ({ focused }) => <TabIcon name="user" focused={focused} />,
         }}
       />
     </Tab.Navigator>
