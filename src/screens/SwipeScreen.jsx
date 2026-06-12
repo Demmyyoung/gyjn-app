@@ -40,6 +40,43 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 
+// Local match score calculation since we removed expensive LLM match from backend
+const calculateMatchScore = (profile, job) => {
+  let score = 50; // base score
+
+  // Category match
+  if (profile.category && job.category) {
+    if (profile.category.toLowerCase() === job.category.toLowerCase()) {
+      score += 25;
+    }
+  }
+
+  // Job type match
+  if (profile.jobType && job.job_type) {
+    if (profile.jobType.toLowerCase() === job.job_type.toLowerCase()) {
+      score += 10;
+    }
+  }
+
+  // Skills match (if tags exist on job and skills on profile)
+  if (profile.skills && profile.skills.length > 0 && job.tags && job.tags.length > 0) {
+    const profileSkills = profile.skills.map(s => 
+      (typeof s === 'string' ? s : s.label || '').toLowerCase()
+    );
+    let matchCount = 0;
+    job.tags.forEach(t => {
+      const tagLabel = (typeof t === 'string' ? t : t.label || '').toLowerCase();
+      if (profileSkills.some(ps => ps.includes(tagLabel) || tagLabel.includes(ps))) {
+        matchCount++;
+      }
+    });
+    score += Math.min(15, matchCount * 3);
+  }
+
+  // Cap at 98% to leave room for "perfect" matches if we ever add them
+  return Math.min(98, score);
+};
+
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CARD_W = SCREEN_W - 48;
 const SWIPE_THRESHOLD = 120;
@@ -399,7 +436,18 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         });
         if (!response.ok) throw new Error('API failed');
         const data = await response.json();
-        return data.jobs || [];
+        
+        // Calculate scores locally since backend no longer sends match %
+        const localScoredJobs = (data.jobs || []).map(job => ({
+          ...job,
+          match: calculateMatchScore({
+            category: activeProfile.category || route.params?.category,
+            skills: activeProfile.skills || route.params?.skills || [],
+            jobType: activeProfile.job_type || route.params?.jobType
+          }, job)
+        }));
+        
+        return localScoredJobs;
       } catch (err) {
         console.warn('API fetch failed, falling back to direct Supabase query:', err.message);
         const { data, error } = await supabase
