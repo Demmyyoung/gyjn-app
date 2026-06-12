@@ -8,10 +8,12 @@ import {
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import * as Haptics from 'expo-haptics';
+import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
   runOnJS, interpolate, withRepeat, withSequence,
 } from 'react-native-reanimated';
+const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -131,6 +133,8 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
 // Reanimated runs animations directly on the UI thread, bypassing the React JS thread.
 function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigation, userName, userType }) {
   const swipeableRef = useRef(null);
+  const hapticFired = useRef(false);
+  const dragXRef = useRef(null);
   const [measuredHeight, setMeasuredHeight] = useState(0);
   const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -228,16 +232,38 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
 
   const renderLeftActions = (progress, dragX) => {
     if (!canChat) return null;
+
+    if (dragX !== dragXRef.current) {
+      if (dragXRef.current) dragXRef.current.removeAllListeners();
+      dragXRef.current = dragX;
+      dragX.addListener(({ value }) => {
+        if (value >= 70 && !hapticFired.current) {
+          hapticFired.current = true;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } else if (value < 70 && hapticFired.current) {
+          hapticFired.current = false;
+        }
+      });
+    }
+
     const scale = dragX.interpolate({
-      inputRange: [0, 20, 60, 100],
+      inputRange: [0, 20, 50, 100],
       outputRange: [0.3, 0.5, 1, 1],
       extrapolate: 'clamp',
     });
     const opacity = dragX.interpolate({
-      inputRange: [0, 20, 60, 100],
+      inputRange: [0, 20, 50, 100],
       outputRange: [0, 0.3, 1, 1],
       extrapolate: 'clamp',
     });
+
+    const CIRCUMFERENCE = 2 * Math.PI * 20; // r=20
+    const strokeDashoffset = dragX.interpolate({
+      inputRange: [20, 70],
+      outputRange: [CIRCUMFERENCE, 0],
+      extrapolate: 'clamp',
+    });
+
     return (
       <View style={{
         width: 80,
@@ -248,14 +274,25 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         <RNAnimated.View style={{
           transform: [{ scale }],
           opacity,
-          backgroundColor: 'rgba(255, 107, 44, 0.12)',
-          width: 48,
-          height: 48,
-          borderRadius: 24,
           justifyContent: 'center',
           alignItems: 'center',
+          width: 48,
+          height: 48,
         }}>
-          <Feather name="message-circle" size={24} color={C.orange} />
+          <Svg width={48} height={48} style={{ position: 'absolute' }}>
+            <Circle cx={24} cy={24} r={20} stroke="rgba(255, 107, 44, 0.15)" strokeWidth={2.5} fill="rgba(255, 107, 44, 0.08)" />
+            <AnimatedCircle
+              cx={24} cy={24} r={20}
+              stroke={C.orange}
+              strokeWidth={2.5}
+              fill="none"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              transform="rotate(-90 24 24)"
+            />
+          </Svg>
+          <Feather name="corner-up-left" size={20} color={C.orange} style={{ position: 'absolute' }} />
         </RNAnimated.View>
       </View>
     );
@@ -286,12 +323,12 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         ref={swipeableRef}
         renderRightActions={renderRightActions}
         renderLeftActions={renderLeftActions}
-        onSwipeableLeftWillOpen={handleChatNavigation}
+        onSwipeableLeftOpen={handleChatNavigation}
         onSwipeableRightWillOpen={handleSwipeableRightOpen}
         friction={2}
         overshootFriction={8}
         rightThreshold={60}
-        leftThreshold={60}
+        leftThreshold={70}
         overshootLeft={true}
         overshootRight={false}
       >
