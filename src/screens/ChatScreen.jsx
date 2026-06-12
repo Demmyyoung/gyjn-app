@@ -13,6 +13,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
 const C = {
@@ -381,7 +382,7 @@ export default function ChatScreen({ route, navigation }) {
 
       await supabase.from('messages').insert({
         match_id: matchId, sender_type: 'system',
-        text: `📞 Call scheduled for ${dateText}`,
+        text: `Call scheduled for ${dateText}`,
       });
     } catch (err) {
       Alert.alert('Scheduling failed', err.message);
@@ -430,7 +431,7 @@ export default function ChatScreen({ route, navigation }) {
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 16, color: C.orange, marginTop: -2 }}>↩️</Text>
+          <Feather name="corner-up-left" size={16} color={C.orange} style={{ marginTop: -2 }} />
         </RNAnimated.View>
       </View>
     );
@@ -469,7 +470,7 @@ export default function ChatScreen({ route, navigation }) {
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 16, color: C.orange, marginTop: -2 }}>↩️</Text>
+          <Feather name="corner-up-left" size={16} color={C.orange} style={{ marginTop: -2 }} />
         </RNAnimated.View>
       </View>
     );
@@ -610,9 +611,12 @@ export default function ChatScreen({ route, navigation }) {
       <View style={styles.callBar}>
         <View style={styles.callBarInfo}>
           <Text style={styles.callBarLabel}>CALL SCHEDULE</Text>
-          <Text style={styles.callBarValue}>
-            {callDate ? `📞 ${callDate}` : '📅 No call scheduled yet'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name={callDate ? "phone-call" : "calendar"} size={12} color={C.night} />
+            <Text style={styles.callBarValue}>
+              {callDate ? callDate : 'No call scheduled yet'}
+            </Text>
+          </View>
         </View>
         {isEmployer && (
           <TouchableOpacity
@@ -732,7 +736,7 @@ export default function ChatScreen({ route, navigation }) {
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.scheduleIcon}>📅</Text>
+            <Feather name="calendar" size={18} color={C.night} />
           </TouchableOpacity>
         )}
 
@@ -785,7 +789,7 @@ export default function ChatScreen({ route, navigation }) {
                 setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
               }}
             >
-              <Text style={styles.menuItemIcon}>↩️</Text>
+              <Feather name="corner-up-left" size={18} color={C.night} />
               <Text style={styles.menuItemText}>Reply</Text>
             </TouchableOpacity>
 
@@ -796,7 +800,7 @@ export default function ChatScreen({ route, navigation }) {
                 activeOpacity={0.7}
                 onPress={() => handleDeleteMessage(menuMsg.id)}
               >
-                <Text style={styles.menuItemIcon}>🗑️</Text>
+                <Feather name="trash-2" size={18} color="#EF4444" />
                 <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Delete</Text>
               </TouchableOpacity>
             )}
@@ -807,7 +811,7 @@ export default function ChatScreen({ route, navigation }) {
               activeOpacity={0.7}
               onPress={() => setMenuMsg(null)}
             >
-              <Text style={styles.menuItemIcon}>✕</Text>
+              <Feather name="x" size={18} color={C.muted} />
               <Text style={[styles.menuItemText, { color: C.muted }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -824,7 +828,10 @@ export default function ChatScreen({ route, navigation }) {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Schedule a Call 📞</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.modalTitle}>Schedule a Call</Text>
+                <Feather name="phone-call" size={18} color={C.night} />
+              </View>
               <Text style={styles.modalDesc}>
                 Propose a date and time for a call. This will show up at the top of the chat and insert a notice.
               </Text>

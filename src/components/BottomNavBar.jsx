@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 3;
@@ -20,17 +21,17 @@ export default function BottomNavBar({ activeIndex, onTabPress }) {
       <Animated.View style={[styles.highlight, { transform: [{ translateX }] }]} />
       
       <TouchableOpacity style={styles.tab} onPress={() => onTabPress(0)}>
-        <Text style={[styles.icon, activeIndex === 0 && styles.activeText]}>💼</Text>
+        <Feather name="search" size={22} color={activeIndex === 0 ? '#FF6B2C' : '#ABABAB'} />
         <Text style={[styles.label, activeIndex === 0 && styles.activeText]}>Discover</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.tab} onPress={() => onTabPress(1)}>
-        <Text style={[styles.icon, activeIndex === 1 && styles.activeText]}>💬</Text>
+        <Feather name="message-circle" size={22} color={activeIndex === 1 ? '#FF6B2C' : '#ABABAB'} />
         <Text style={[styles.label, activeIndex === 1 && styles.activeText]}>Matches</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.tab} onPress={() => onTabPress(2)}>
-        <Text style={[styles.icon, activeIndex === 2 && styles.activeText]}>👤</Text>
+        <Feather name="user" size={22} color={activeIndex === 2 ? '#FF6B2C' : '#ABABAB'} />
         <Text style={[styles.label, activeIndex === 2 && styles.activeText]}>Profile</Text>
       </TouchableOpacity>
     </View>

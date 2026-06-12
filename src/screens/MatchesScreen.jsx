@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
 const C = {
@@ -55,10 +56,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
       <View style={[styles.logoBox, userType === 'employer' && { backgroundColor: C.peach }]}>
         {userType === 'employer' ? (
           <Text style={[styles.logoEmoji, { color: C.orange, fontSize: 24, fontWeight: '800' }]}>
-            {(item.candidate_name || '👤').substring(0, 1).toUpperCase()}
+            {(item.candidate_name || 'U').substring(0, 1).toUpperCase()}
           </Text>
         ) : (
-          <Text style={styles.logoEmoji}>{item.jobs?.emoji ?? '💼'}</Text>
+          <Feather name="briefcase" size={24} color={C.night} />
         )}
       </View>
 
@@ -105,7 +106,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
                 if (onChatPress) onChatPress();
               }}
             >
-              <Text style={styles.chatActionText}>Chat 💬</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={styles.chatActionText}>Chat</Text>
+                <Feather name="message-circle" size={14} color="#7B4FE9" />
+              </View>
             </TouchableOpacity>
             {hasUnread && (
               <View style={styles.unreadDot} />
@@ -251,7 +255,7 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Text style={{ fontSize: 24, marginTop: -2 }}>💬</Text>
+          <Feather name="message-circle" size={24} color={C.orange} />
         </RNAnimated.View>
       </View>
     );
@@ -265,7 +269,10 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
         activeOpacity={0.8}
         onPress={handleUnapplyPress}
       >
-        <Text style={styles.unapplySwipeText}>Un - apply ✕</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={styles.unapplySwipeText}>Un - apply</Text>
+          <Feather name="x" size={14} color="#fff" />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -706,7 +713,7 @@ export default function MatchesScreen({ route, navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🧞‍♂️</Text>
+              <Feather name="star" size={72} color={C.orange} style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>
                 {searchQuery || selectedStage !== 'All' ? 'No matches found' : 'No wishes granted yet'}
               </Text>
@@ -741,14 +748,14 @@ export default function MatchesScreen({ route, navigation }) {
                   <View style={styles.sheetHeader}>
                     <Text style={styles.sheetTitle}>Candidate Profile</Text>
                     <TouchableOpacity onPress={closeSheet}>
-                      <Text style={styles.sheetClose}>✕</Text>
+                      <Feather name="x" size={24} color={C.hint} />
                     </TouchableOpacity>
                   </View>
 
                   <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
                     <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: C.peach, borderColor: 'transparent' }]}>
                       <Text style={{ fontSize: 28, fontWeight: '800', color: C.orange }}>
-                        {(selectedJob.candidate_name || '👤').substring(0, 1).toUpperCase()}
+                        {(selectedJob.candidate_name || 'U').substring(0, 1).toUpperCase()}
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
@@ -766,11 +773,14 @@ export default function MatchesScreen({ route, navigation }) {
                   <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#EBEBEB', padding: 16, position: 'relative' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <Text style={{ fontSize: 13, fontWeight: '800', color: C.orange, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                        ✨ AI Recruiter Insights
+                        AI Recruiter Insights
                       </Text>
                       {selectedJob.ai_summary && !analyzing && (
                         <TouchableOpacity onPress={() => generateAiRecommendation(true)}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.hint }}>Regenerate ↺</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: C.hint }}>Regenerate</Text>
+                            <Feather name="refresh-cw" size={11} color={C.hint} />
+                          </View>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -784,7 +794,10 @@ export default function MatchesScreen({ route, navigation }) {
                       </View>
                     ) : analysisError ? (
                       <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.15)' }}>
-                        <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>⚠️ {analysisError}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Feather name="alert-triangle" size={14} color="#EF4444" />
+                          <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>{analysisError}</Text>
+                        </View>
                         <TouchableOpacity onPress={() => generateAiRecommendation(true)} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
                           <Text style={{ color: C.orange, fontSize: 11, fontWeight: '800' }}>Try Again</Text>
                         </TouchableOpacity>
@@ -867,9 +880,7 @@ export default function MatchesScreen({ route, navigation }) {
                             onPress={() => handleUpdateStatus(selectedJob.match_id, stage)}
                             activeOpacity={0.8}
                           >
-                            <Text style={{ fontSize: 14, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, letterSpacing: 0.5 }}>
-                              {stage === 'Applied' ? '📋' : stage === 'Interviewing' ? '🎤' : '🎉'}
-                            </Text>
+                            <Feather name={stage === 'Applied' ? 'clipboard' : stage === 'Interviewing' ? 'mic' : 'award'} size={18} color={isCurrent ? sc.text : sc.textInactive} />
                             <Text style={{ fontSize: 11, fontWeight: '800', color: isCurrent ? sc.text : sc.textInactive, marginTop: 4 }}>
                               {stage}
                             </Text>
@@ -888,7 +899,10 @@ export default function MatchesScreen({ route, navigation }) {
                           navigation.navigate('Chat', { match: selectedJob, userName, userType });
                         }}
                       >
-                        <Text style={styles.submitText}>Chat with Candidate 💬</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                          <Text style={styles.submitText}>Chat with Candidate</Text>
+                          <Feather name="message-circle" size={16} color="#fff" />
+                        </View>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -905,7 +919,7 @@ export default function MatchesScreen({ route, navigation }) {
 
                   <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
                     <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || C.peach, borderColor: 'transparent' }]}>
-                      <Text style={{ fontSize: 32 }}>{selectedJob.jobs?.emoji || '💼'}</Text>
+                      <Feather name="briefcase" size={32} color={C.night} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.jobs?.role}</Text>
@@ -951,7 +965,10 @@ export default function MatchesScreen({ route, navigation }) {
                         navigation.navigate('Chat', { match: selectedJob, userName, userType });
                       }}
                     >
-                      <Text style={styles.submitText}>Chat 💬</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                        <Text style={styles.submitText}>Chat</Text>
+                        <Feather name="message-circle" size={16} color="#fff" />
+                      </View>
                     </TouchableOpacity>
                   ) : (
                     <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>

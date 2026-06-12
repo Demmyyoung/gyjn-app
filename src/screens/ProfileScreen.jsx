@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
 // Base64 to ArrayBuffer decoder for React Native uploads
@@ -72,16 +73,16 @@ const ALL_SKILLS = [
 ];
 
 const CATEGORIES = [
-  { name: 'Tech & Software', emoji: '💻' },
-  { name: 'Design & Creative', emoji: '🎨' },
-  { name: 'Product & Project', emoji: '📊' },
-  { name: 'Data & Analytics', emoji: '📈' },
-  { name: 'Marketing & Sales', emoji: '✍️' },
-  { name: 'Business & Operations', emoji: '⚙️' },
-  { name: 'Finance & Accounting', emoji: '💰' },
-  { name: 'Human Resources', emoji: '👥' },
-  { name: 'Supply Chain & Logistics', emoji: '📦' },
-  { name: 'Other', emoji: '💼' }
+  { name: 'Tech & Software', icon: 'monitor' },
+  { name: 'Design & Creative', icon: 'pen-tool' },
+  { name: 'Product & Project', icon: 'trello' },
+  { name: 'Data & Analytics', icon: 'trending-up' },
+  { name: 'Marketing & Sales', icon: 'pie-chart' },
+  { name: 'Business & Operations', icon: 'settings' },
+  { name: 'Finance & Accounting', icon: 'dollar-sign' },
+  { name: 'Human Resources', icon: 'users' },
+  { name: 'Supply Chain & Logistics', icon: 'truck' },
+  { name: 'Other', icon: 'briefcase' }
 ];
 
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
@@ -586,7 +587,7 @@ export default function ProfileScreen({ route, navigation }) {
         <View style={{ width: 40 }} />
         <Text style={styles.title}>Profile</Text>
         <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
-          <Text style={styles.editIcon}>✎</Text>
+          <Feather name="edit-2" size={18} color={C.night} />
         </TouchableOpacity>
       </View>
 
@@ -608,12 +609,12 @@ export default function ProfileScreen({ route, navigation }) {
         {/* Statistical Grid - Premium, independent glassmorphic cards */}
         <View style={styles.statsCardsRow}>
           {[
-            { val: localSwipes, lbl: 'Swipes', icon: '⚡', color: C.orange },
-            { val: localMatches,  lbl: isEmployer ? 'Applicants' : 'Applied', icon: '🧞‍♂️', color: '#7B4FE9' },
+            { val: localSwipes, lbl: 'Swipes', icon: 'zap', color: C.orange },
+            { val: localMatches,  lbl: isEmployer ? 'Applicants' : 'Applied', icon: 'star', color: '#7B4FE9' },
           ].map(({ val, lbl, icon, color }) => (
             <View key={lbl} style={styles.statCard}>
               <View style={[styles.statIconBox, { backgroundColor: `${color}12` }]}>
-                <Text style={{ fontSize: 16 }}>{icon}</Text>
+                <Feather name={icon} size={16} color={color} />
               </View>
               <Text style={styles.statCardVal}>{val}</Text>
               <Text style={styles.statCardLbl}>{lbl}</Text>
@@ -633,7 +634,7 @@ export default function ProfileScreen({ route, navigation }) {
               ))}
             </View>
           ) : (
-            <Text style={styles.emptyHint}>Tap ✎ to add your skills</Text>
+            <Text style={styles.emptyHint}>Tap edit icon to add your skills</Text>
           )}
         </View>
 
@@ -645,7 +646,7 @@ export default function ProfileScreen({ route, navigation }) {
             { label: 'Looking for',  val: profile.jobType },
             ...(isEmployer ? [] : [{ label: 'Category', val: profile.category }]),
             { label: 'Availability', val: 'Immediate' },
-            { label: 'Remote OK?',   val: 'Yes 🌍' },
+            { label: 'Remote OK?',   val: 'Yes' },
           ].map(({ label, val }) => (
             <View key={label} style={styles.prefRow}>
               <Text style={styles.prefLabel}>{label}</Text>
@@ -660,10 +661,10 @@ export default function ProfileScreen({ route, navigation }) {
           {cvUrl ? (
             <View>
               <View style={styles.cvRow}>
-                <Text style={styles.cvIcon}>📄</Text>
+                <Feather name="file-text" size={20} color="#065F46" />
                 <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'My CV'}</Text>
                 <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtn}>
-                  <Text style={styles.cvDeleteText}>✕</Text>
+                  <Feather name="x" size={14} color="#EF4444" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity 
@@ -686,7 +687,7 @@ export default function ProfileScreen({ route, navigation }) {
                 {cvUploading || aiParsing ? (
                   <ActivityIndicator size="small" color={C.orange} />
                 ) : (
-                  <Text style={{ fontSize: 14 }}>✨</Text>
+                  <Feather name="refresh-cw" size={14} color={C.orange} />
                 )}
                 <Text style={{ color: C.orange, fontWeight: '700', fontSize: 13 }}>
                   {aiParsing ? 'Genie is updating your profile...' : 'Upload newer CV to sync profile'}
@@ -698,7 +699,7 @@ export default function ProfileScreen({ route, navigation }) {
               {cvUploading || aiParsing
                 ? <ActivityIndicator color={C.orange} size="small" />
                 : <>
-                    <Text style={styles.cvBoxIcon}>📄</Text>
+                    <Feather name="file-text" size={24} color={C.night} />
                     <Text style={styles.cvBoxText}>Upload CV</Text>
                     <Text style={styles.cvBoxSub}>Tap here to auto-fill profile</Text>
                   </>
@@ -840,7 +841,7 @@ export default function ProfileScreen({ route, navigation }) {
                           disabled={aiParsing}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
+                          <Feather name={cat.icon} size={15} color={selected ? C.orange : C.muted} style={{ marginRight: 4 }} />
                           <Text style={[styles.categoryText, selected && styles.categoryTextActive, aiParsing && { color: C.orange }]}>
                             {cat.name}
                           </Text>
@@ -890,7 +891,7 @@ export default function ProfileScreen({ route, navigation }) {
                         <View key={skill} style={styles.skillTag}>
                           <Text style={styles.skillTagText}>{skill}</Text>
                           <TouchableOpacity onPress={() => removeDraftSkill(skill)} disabled={aiParsing}>
-                            <Text style={styles.skillTagDelete}>✕</Text>
+                            <Feather name="x" size={12} color={C.orange} style={{ paddingLeft: 4 }} />
                           </TouchableOpacity>
                         </View>
                       ))
@@ -905,10 +906,20 @@ export default function ProfileScreen({ route, navigation }) {
 
               {/* CV section */}
               <View style={styles.group}>
-                <Text style={styles.fieldLabel}>CV / RESUME</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.fieldLabel}>CV / RESUME</Text>
+                  <Text style={{ fontSize: 10, color: '#06b6d4', fontWeight: '700' }}>AUTO-UPDATES PROFILE</Text>
+                </View>
+                
+                <View style={{ backgroundColor: 'rgba(6, 182, 212, 0.08)', padding: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(6, 182, 212, 0.2)' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Feather name="zap" size={14} color="#0891b2" />
+                    <Text style={{ fontSize: 12, color: '#0891b2', fontWeight: '600', flex: 1 }}>Upload a new CV to automatically update your profile details.</Text>
+                  </View>
+                </View>
                 {cvUrl && !aiParsing ? (
                   <View style={styles.cvEditRow}>
-                    <Text style={styles.cvIcon}>📄</Text>
+                    <Feather name="file-text" size={20} color="#065F46" />
                     <Text style={styles.cvFileName} numberOfLines={1}>{cvName || 'Uploaded CV'}</Text>
                     <TouchableOpacity onPress={pickAndUploadCV} style={styles.cvReplaceBtn} disabled={cvUploading || aiParsing}>
                       {cvUploading
@@ -917,7 +928,7 @@ export default function ProfileScreen({ route, navigation }) {
                       }
                     </TouchableOpacity>
                     <TouchableOpacity onPress={deleteCV} style={styles.cvDeleteBtnEdit}>
-                      <Text style={styles.cvDeleteText}>✕</Text>
+                      <Feather name="x" size={14} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -939,14 +950,14 @@ export default function ProfileScreen({ route, navigation }) {
                       <>
                         <ActivityIndicator color={C.orange} size="small" />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.cvPickText}>🧞‍♂️ Genie is reading your CV...</Text>
+                          <Text style={styles.cvPickText}>Genie is reading your CV...</Text>
                           <Text style={styles.cvPickSub}>Updating your draft details</Text>
                         </View>
                       </>
                     ) : (
                       <>
-                        <Text style={styles.cvPickIcon}>📄</Text>
-                        <View style={{ flex: 1 }}>
+                        <Feather name="upload-cloud" size={24} color={C.orange} />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
                           <Text style={styles.cvPickText}>Upload your CV</Text>
                           <Text style={styles.cvPickSub}>PDF or Word</Text>
                         </View>
@@ -984,7 +995,9 @@ export default function ProfileScreen({ route, navigation }) {
             {/* Header */}
             <View style={styles.reviewHeader}>
               <View style={styles.reviewHeaderLeft}>
-                <Text style={styles.reviewEmoji}>🧞‍♂️</Text>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,107,44,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="star" size={18} color={C.orange} />
+                </View>
                 <View>
                   <Text style={styles.reviewTitle}>Profile Update</Text>
                   <Text style={styles.reviewSub}>Genie extracted these from your CV</Text>
@@ -1000,11 +1013,11 @@ export default function ProfileScreen({ route, navigation }) {
               showsVerticalScrollIndicator={false}
             >
               {cvChanges && [
-                { key: 'name', label: 'Full Name', icon: '👤', current: profile.name, suggested: cvChanges.name },
-                { key: 'role', label: 'Professional Title', icon: '💼', current: profile.role, suggested: cvChanges.role },
-                { key: 'about', label: 'About You', icon: '📝', current: profile.about, suggested: cvChanges.about },
-                { key: 'category', label: 'Category', icon: '🏷️', current: profile.category, suggested: cvChanges.category },
-                { key: 'skills', label: 'Skills', icon: '⚡', current: profile.skills?.join(', '), suggested: cvChanges.skills?.join(', ') },
+                { key: 'name', label: 'Full Name', icon: 'user', current: profile.name, suggested: cvChanges.name },
+                { key: 'role', label: 'Professional Title', icon: 'briefcase', current: profile.role, suggested: cvChanges.role },
+                { key: 'about', label: 'About You', icon: 'file-text', current: profile.about, suggested: cvChanges.about },
+                { key: 'category', label: 'Category', icon: 'tag', current: profile.category, suggested: cvChanges.category },
+                { key: 'skills', label: 'Skills', icon: 'zap', current: profile.skills?.join(', '), suggested: cvChanges.skills?.join(', ') },
               ].filter(f => f.suggested && f.suggested !== f.current).map((field, idx) => {
                 const accepted = acceptedFields[field.key];
                 const hasChanged = field.suggested !== field.current;
@@ -1021,12 +1034,12 @@ export default function ProfileScreen({ route, navigation }) {
                   >
                     {/* Toggle indicator */}
                     <View style={[styles.reviewToggle, accepted && styles.reviewToggleActive]}>
-                      {accepted && <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>✓</Text>}
+                      {accepted && <Feather name="check" size={12} color="#fff" />}
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ fontSize: 13 }}>{field.icon}</Text>
+                        <Feather name={field.icon} size={14} color={C.muted} />
                         <Text style={styles.reviewFieldLabel}>{field.label}</Text>
                       </View>
 
@@ -1057,7 +1070,8 @@ export default function ProfileScreen({ route, navigation }) {
                     style={styles.reviewAcceptBtn}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   >
-                    <Text style={styles.reviewAcceptText}>Accept Selected Changes ✓</Text>
+                    <Feather name="check" size={16} color="#fff" />
+                    <Text style={styles.reviewAcceptText}>Accept Selected Changes</Text>
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -1080,7 +1094,8 @@ export default function ProfileScreen({ route, navigation }) {
                   activeOpacity={0.85}
                   style={styles.reviewEditBtn}
                 >
-                  <Text style={styles.reviewEditText}>Review & Edit Manually ✎</Text>
+                  <Feather name="edit-2" size={14} color="#0891b2" />
+                  <Text style={styles.reviewEditText}>Review & Edit Manually</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

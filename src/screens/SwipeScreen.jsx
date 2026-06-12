@@ -38,6 +38,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 
 // Local match score calculation since we removed expensive LLM match from backend
@@ -127,7 +128,7 @@ const getNotifStyle = (type) => {
         bg: '#FFF9E6',
         border: 'rgba(255, 179, 0, 0.4)',
         text: '#D97706',
-        emoji: '🎯',
+        icon: 'target',
         label: "You've been moved to the Interviewing section!",
       };
     case 'Hired':
@@ -135,7 +136,7 @@ const getNotifStyle = (type) => {
         bg: '#E6F9F0',
         border: 'rgba(0, 200, 150, 0.4)',
         text: '#059669',
-        emoji: '🏆',
+        icon: 'award',
         label: 'Congratulations! You have been hired!',
       };
     case 'Message':
@@ -144,7 +145,7 @@ const getNotifStyle = (type) => {
         bg: '#F3E8FF',
         border: 'rgba(123, 79, 233, 0.4)',
         text: '#7E22CE',
-        emoji: '💬',
+        icon: 'message-circle',
         label: 'New message received',
       };
   }
@@ -198,7 +199,7 @@ function JobCard({ job, onPress, isTop }) {
         >
           <View style={styles.cardLogoWrap}>
             <View style={styles.cardLogoBox}>
-              <Text style={styles.cardLogoEmoji}>{job.emoji}</Text>
+              <Feather name="briefcase" size={24} color={C.night} />
             </View>
           </View>
         </LinearGradient>
@@ -374,7 +375,7 @@ function LoadingPulse() {
   return (
     <View style={styles.pulseContainer}>
       <Animated.View style={[styles.pulseCircle, animatedStyle]}>
-        <Text style={styles.pulseEmoji}>🧞‍♂️</Text>
+        <Feather name="search" size={24} color={C.orange} />
       </Animated.View>
       <ActivityIndicator size="small" color={C.orange} style={{ marginTop: 24 }} />
     </View>
@@ -514,7 +515,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
                     type: 'Message',
                     company: matchData.jobs?.company || 'Company',
                     role: matchData.jobs?.role || 'Role',
-                    emoji: '💬',
+                    icon: 'message-circle',
                     text: lastMsg.text,
                     match: matchData,
                   });
@@ -523,7 +524,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
                     type: newStatus,
                     company: matchData.jobs?.company || 'Company',
                     role: matchData.jobs?.role || 'Role',
-                    emoji: matchData.jobs?.emoji || '💼',
+                    icon: 'briefcase',
                     match: matchData,
                   });
                 }
@@ -548,7 +549,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
                 type: 'Message',
                 company: matchData.jobs?.company || 'Company',
                 role: matchData.jobs?.role || 'Role',
-                emoji: '💬',
+                icon: 'message-circle',
                 text: payload.new.text,
                 match: matchData,
               });
@@ -1057,7 +1058,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
             onPress={handleMorphingBtnPress}
           >
             <View style={styles.filterBtnCircle}>
-              <Text style={styles.filterIcon}>☰</Text>
+              <Feather name="menu" size={16} color={C.night} />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -1091,15 +1092,17 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.notifCloseText}>✕</Text>
+              <Feather name="x" size={14} color="#666" />
             </TouchableOpacity>
 
             {/* Notification Header Row */}
             <View style={styles.notifBubbleRow}>
-              <Text style={styles.notifBubbleEmoji}>
-                {cachedNotification ? getNotifStyle(cachedNotification.type).emoji : '💼'}
-              </Text>
-              <Text style={styles.notifBubbleTitle} numberOfLines={1}>
+              <Feather 
+                name={cachedNotification ? getNotifStyle(cachedNotification.type).icon : 'briefcase'} 
+                size={20} 
+                color={cachedNotification ? getNotifStyle(cachedNotification.type).text : C.night}
+              />
+              <Text style={[styles.notifBubbleTitle, { marginLeft: 6 }]} numberOfLines={1}>
                 {cachedNotification ? `${cachedNotification.company} · ${cachedNotification.role}` : ''}
               </Text>
             </View>
@@ -1134,11 +1137,14 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.emptyDeck}>
-            <Text style={styles.emptyIcon}>🧞‍♂️</Text>
+            <Feather name="star" size={72} color={C.orange} style={{ marginBottom: 8 }} />
             <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
             <Text style={styles.emptySubtitle}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
             <TouchableOpacity style={styles.reloadBtn} onPress={handleReload}>
-              <Text style={styles.reloadBtnText}>Refresh Wishes ↺</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.reloadBtnText}>Refresh Wishes</Text>
+                <Feather name="refresh-cw" size={14} color="#fff" />
+              </View>
             </TouchableOpacity>
           </View>
         ) : renderCards()}
