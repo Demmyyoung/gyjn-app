@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.cream },
   inner: {
     flex: 1,
-    paddingHorizontal: 28,
+    paddingHorizontal: 20,
     justifyContent: 'center',
-    gap: 36,
+    gap: 28,
   },
   header: { gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-end' },

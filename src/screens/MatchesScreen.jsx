@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import BounceButton from '../components/BounceButton';
 
 const C = {
   orange:    '#FF6B2C',
@@ -48,9 +49,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
   const hasUnread = lastMsg && (lastMsg.sender_type === otherSenderType || (otherSenderType === 'seeker' && lastMsg.sender_type === 'candidate'));
 
   return (
-    <TouchableOpacity
+    <BounceButton
       style={styles.card}
       activeOpacity={onPress ? 0.8 : 1.0}
+      activeScale={onPress ? 0.95 : 1.0}
       onPress={onPress}
       disabled={!onPress}
     >
@@ -100,9 +102,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
         </View>
         {canChat && onPress && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <TouchableOpacity 
+            <BounceButton 
               style={styles.chatActionIndicator}
               activeOpacity={0.6}
+              activeScale={0.9}
               onPress={(e) => {
                 e.stopPropagation();
                 if (onChatPress) onChatPress();
@@ -112,7 +115,7 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
                 <Text style={styles.chatActionText}>Chat</Text>
                 <Feather name="message-circle" size={14} color="#7B4FE9" />
               </View>
-            </TouchableOpacity>
+            </BounceButton>
             {hasUnread && (
               <View style={styles.unreadDot} />
             )}
@@ -124,7 +127,7 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
           </View>
         )}
       </View>
-    </TouchableOpacity>
+    </BounceButton>
   );
 }
 
@@ -1136,7 +1139,7 @@ const styles = StyleSheet.create({
   },
 
   // List
-  listContent: { paddingHorizontal: 16, paddingBottom: 24, gap: 10 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 120, gap: 10 },
   listEmpty:   { flex: 1, justifyContent: 'center' },
   sectionLabel: {
     fontSize: 11, fontWeight: '800', textTransform: 'uppercase',

@@ -7,9 +7,10 @@ import { NavigationContainer, useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Text, View, Pressable, Dimensions } from "react-native";
+import { Text, View, Pressable, Dimensions, Platform } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
-
+import { BlurView } from 'expo-blur';
+import BounceButton from './src/components/BounceButton';
 
 import SplashScreen    from "./src/screens/SplashScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
@@ -68,13 +69,21 @@ function CustomTabBar({ state, descriptors, navigation }) {
     };
   });
 
+  const GlassBackground = Platform.OS === 'ios' ? BlurView : View;
+
   return (
-    <View style={{
-      backgroundColor: '#ffffff',
-      borderTopWidth: 1,
-      borderTopColor: 'rgba(0,0,0,0.06)',
-      paddingBottom: insets.bottom,
-    }}>
+    <GlassBackground 
+      intensity={80} 
+      tint="light"
+      style={{
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.6)' : '#ffffff',
+        borderTopWidth: 1,
+        borderTopColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.06)',
+        paddingBottom: insets.bottom,
+      }}
+    >
       <View style={{
         height: 58,
         flexDirection: 'row',
@@ -119,9 +128,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
           const icon = options.tabBarIcon ? options.tabBarIcon({ focused: isFocused }) : null;
 
           return (
-            <Pressable
+            <BounceButton
               key={route.key}
               onPress={onPress}
+              activeScale={0.85}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -138,11 +148,11 @@ function CustomTabBar({ state, descriptors, navigation }) {
               }}>
                 {label}
               </Text>
-            </Pressable>
+            </BounceButton>
           );
         })}
       </View>
-    </View>
+    </GlassBackground>
   );
 }
 

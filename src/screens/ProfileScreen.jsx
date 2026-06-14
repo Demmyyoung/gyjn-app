@@ -17,6 +17,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import BounceButton from '../components/BounceButton';
 
 // Base64 to ArrayBuffer decoder for React Native uploads
 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -586,9 +587,9 @@ export default function ProfileScreen({ route, navigation }) {
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
         <View style={{ width: 40 }} />
         <Text style={styles.title}>Profile</Text>
-        <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
+        <BounceButton style={styles.editBtn} onPress={openEdit} activeScale={0.85}>
           <Feather name="edit-2" size={18} color={C.night} />
-        </TouchableOpacity>
+        </BounceButton>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -1120,7 +1121,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
   },
   editIcon: { fontSize: 18, color: C.night },
-  scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 14 },
+  scroll: { paddingHorizontal: 24, paddingBottom: 120, gap: 14 },
 
   // Profile card
   profileCard: {

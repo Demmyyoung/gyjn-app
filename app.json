@@ -45,7 +45,8 @@
       "url": "https://u.expo.dev/5d4538d6-df3f-4366-a08c-fcc61d7da767"
     },
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

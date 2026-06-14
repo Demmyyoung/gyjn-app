@@ -14,6 +14,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import CustomDateTimePicker from '../components/CustomDateTimePicker';
+import { BlurView } from 'expo-blur';
+import BounceButton from '../components/BounceButton';
 import { supabase } from '../lib/supabase';
 
 const C = {
@@ -25,6 +28,13 @@ const C = {
   hint:    '#BEBEBE',
   border:  '#EBEBEB',
   lightBg: '#F7F7FA',
+};
+
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -123,8 +133,25 @@ export default function ChatScreen({ route, navigation }) {
 
   // Call scheduling (employer only)
   const [callDate, setCallDate] = useState(match?.call_date || null);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleInput, setScheduleInput] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
+  const parseCallDate = useCallback((dateString) => {
+    if (!dateString) return new Date();
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) ? new Date() : d;
+  }, []);
+
+  const displayCallDate = useMemo(() => {
+    if (!callDate) return 'No call scheduled yet';
+    const d = new Date(callDate);
+    if (isNaN(d.getTime())) return callDate;
+    return d.toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+  }, [callDate]);
 
   // Determine names
   const jobTitle = match?.jobs?.role ?? 'Role';
@@ -310,8 +337,9 @@ export default function ChatScreen({ route, navigation }) {
     setReplyTo(null);
     setSending(true);
 
+    const newId = generateUUID();
     const optimisticMsg = {
-      id: `temp-${Date.now()}`,
+      id: newId,
       match_id: matchId,
       sender_type: userType,
       text: typedText,
@@ -322,7 +350,7 @@ export default function ChatScreen({ route, navigation }) {
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      const payload = { match_id: matchId, sender_type: userType, text: typedText };
+      const payload = { id: newId, match_id: matchId, sender_type: userType, text: typedText };
       if (replyId) payload.reply_to = replyId;
 
       const { data, error } = await supabase.from('messages').insert(payload).select();
@@ -365,24 +393,24 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   // ── Schedule call (employer only) ──
-  const handleScheduleConfirm = async () => {
-    if (!scheduleInput.trim()) {
-      Alert.alert('Date Required', 'Please enter a date and time for the call.');
-      return;
-    }
-    const dateText = scheduleInput.trim();
-    setShowScheduleModal(false);
-    setScheduleInput('');
+  const handleScheduleConfirm = async (finalDate) => {
+    setShowDatePicker(false);
+    const isoString = finalDate.toISOString();
 
     try {
       const { error: matchError } = await supabase
-        .from('matches').update({ call_date: dateText }).eq('match_id', matchId);
+        .from('matches').update({ call_date: isoString }).eq('match_id', matchId);
       if (matchError) throw matchError;
-      setCallDate(dateText);
+      setCallDate(isoString);
+
+      const formattedNotice = finalDate.toLocaleString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+      });
 
       await supabase.from('messages').insert({
         match_id: matchId, sender_type: 'system',
-        text: `Call scheduled for ${dateText}`,
+        text: `Call scheduled for ${formattedNotice}`,
       });
     } catch (err) {
       Alert.alert('Scheduling failed', err.message);
@@ -583,6 +611,8 @@ export default function ChatScreen({ route, navigation }) {
     );
   };
 
+  const GlassBackground = Platform.OS === 'ios' ? BlurView : View;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -591,48 +621,42 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar barStyle="dark-content" />
 
-      {/* Custom Navigation Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{recipientName}</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{jobTitle}</Text>
-        </View>
-        <View style={{ width: 36 }} />
-      </View>
-
-      {/* Scheduled Call Info Bar — always visible, but only employer can change */}
-      <View style={styles.callBar}>
-        <View style={styles.callBarInfo}>
-          <Text style={styles.callBarLabel}>CALL SCHEDULE</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Feather name={callDate ? "phone-call" : "calendar"} size={12} color={C.night} />
-            <Text style={styles.callBarValue}>
-              {callDate ? callDate : 'No call scheduled yet'}
-            </Text>
+      {/* Top Glass Area: Header + Call Bar */}
+      <GlassBackground intensity={85} tint="light" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.65)' : '#ffffff' }}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 12), backgroundColor: 'transparent', borderBottomWidth: 0 }]}>
+          <BounceButton onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>←</Text>
+          </BounceButton>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{recipientName}</Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{jobTitle}</Text>
           </View>
+          <View style={{ width: 36 }} />
         </View>
-        {isEmployer && (
-          <TouchableOpacity
-            onPress={() => {
-              setScheduleInput(callDate || '');
-              setShowScheduleModal(true);
-            }}
-            style={styles.callBarBtn}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.callBarBtnText}>
-              {callDate ? 'Reschedule' : 'Set Call'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+
+        <View style={[styles.callBar, { backgroundColor: 'transparent' }]}>
+          <View style={styles.callBarInfo}>
+            <Text style={styles.callBarLabel}>CALL SCHEDULE</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name={callDate ? "phone-call" : "calendar"} size={12} color={C.night} />
+              <Text style={styles.callBarValue}>{displayCallDate}</Text>
+            </View>
+          </View>
+          {isEmployer && (
+            <BounceButton
+              onPress={() => {
+                setTempDate(parseCallDate(callDate));
+                setShowDatePicker(true);
+              }}
+              style={styles.callBarBtn}
+            >
+              <Text style={styles.callBarBtnText}>{callDate ? 'Reschedule' : 'Set Call'}</Text>
+            </BounceButton>
+          )}
+        </View>
+      </GlassBackground>
+
+
 
       {/* Messages Feed */}
       {loading ? (
@@ -640,12 +664,13 @@ export default function ChatScreen({ route, navigation }) {
           <ActivityIndicator color={C.orange} size="large" />
         </View>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
+        <View style={StyleSheet.absoluteFill}>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
           renderItem={renderMessageItem}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 100, paddingBottom: insets.bottom + 120 }]}
           showsVerticalScrollIndicator={false}
           onLayout={() => {
             if (messages.length > 0) {
@@ -666,106 +691,83 @@ export default function ChatScreen({ route, navigation }) {
               }, 50);
             }
           }}
-          ListFooterComponent={remoteIsTyping ? <TypingDots /> : null}
         />
-      )}
-
-      {/* Reply Preview Bar */}
-      {replyTo && !editingMsg && (
-        <View style={styles.replyBar}>
-          <View style={styles.replyBarAccent} />
-          <View style={styles.replyBarContent}>
-            <Text style={styles.replyBarSender}>
-               Replying to {replyTo.sender_type === userType || (userType === 'seeker' && replyTo.sender_type === 'candidate') ? 'yourself' : recipientName}
-            </Text>
-            <Text style={styles.replyBarText} numberOfLines={1}>
-              {replyTo.text}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-              setReplyTo(null);
-            }}
-            style={styles.replyBarClose}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.replyBarCloseText}>✕</Text>
-          </TouchableOpacity>
         </View>
       )}
+      
+      {/* Spacer to push Bottom Area down */}
+      <View style={{ flex: 1 }} pointerEvents="none" />
 
-      {/* Edit Preview Bar */}
-      {editingMsg && (
-        <View style={styles.replyBar}>
-          <View style={[styles.replyBarAccent, { backgroundColor: C.orange }]} />
-          <View style={styles.replyBarContent}>
-            <Text style={[styles.replyBarSender, { color: C.orange }]}>
-               Editing Message
-            </Text>
-            <Text style={styles.replyBarText} numberOfLines={1}>
-              {editingMsg.text}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-              setEditingMsg(null); 
-              setInputText(''); 
-            }}
-            style={styles.replyBarClose}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.replyBarCloseText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Typing indicator (Moved outside scroll area) */}
+      {remoteIsTyping && <TypingDots />}
 
-      {/* Footer Input Bar */}
-      <View
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}
-      >
-        {isEmployer && (
-          <TouchableOpacity
-            style={styles.scheduleIconBtn}
-            onPress={() => {
-              setScheduleInput(callDate || '');
-              setShowScheduleModal(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Feather name="calendar" size={18} color={C.night} />
-          </TouchableOpacity>
+      {/* Bottom Glass Area: Reply/Edit + Input Bar */}
+      <View style={{ width: '100%' }}>
+        {/* Reply Preview Bar */}
+        {replyTo && !editingMsg && (
+          <GlassBackground intensity={85} tint="light" style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}>
+            <View style={styles.replyBarAccent} />
+            <View style={styles.replyBarContent}>
+              <Text style={styles.replyBarSender}>
+                 Replying to {replyTo.sender_type === userType || (userType === 'seeker' && replyTo.sender_type === 'candidate') ? 'yourself' : recipientName}
+              </Text>
+              <Text style={styles.replyBarText} numberOfLines={1}>{replyTo.text}</Text>
+            </View>
+            <BounceButton onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setReplyTo(null); }} style={styles.replyBarClose}>
+              <Text style={styles.replyBarCloseText}>✕</Text>
+            </BounceButton>
+          </GlassBackground>
         )}
 
-        <TextInput
-          ref={inputRef}
-          style={styles.textInput}
-          placeholder={editingMsg ? 'Editing message...' : replyTo ? 'Type your reply...' : 'Type your message...'}
-          placeholderTextColor={C.hint}
-          value={inputText}
-          onChangeText={handleTextChange}
-          multiline
-          maxHeight={100}
-        />
+        {/* Edit Preview Bar */}
+        {editingMsg && (
+          <GlassBackground intensity={85} tint="light" style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}>
+            <View style={[styles.replyBarAccent, { backgroundColor: C.orange }]} />
+            <View style={styles.replyBarContent}>
+              <Text style={[styles.replyBarSender, { color: C.orange }]}>Editing Message</Text>
+              <Text style={styles.replyBarText} numberOfLines={1}>{editingMsg.text}</Text>
+            </View>
+            <BounceButton onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setEditingMsg(null); setInputText(''); }} style={styles.replyBarClose}>
+              <Text style={styles.replyBarCloseText}>✕</Text>
+            </BounceButton>
+          </GlassBackground>
+        )}
 
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-          style={[
-            styles.sendBtn,
-            (!inputText.trim() || sending) && styles.sendBtnDisabled,
-          ]}
-          activeOpacity={0.8}
+        {/* Footer Input Bar */}
+        <GlassBackground
+          intensity={85} tint="light"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}
         >
-          {sending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.sendBtnText}>Send</Text>
+          {isEmployer && (
+            <BounceButton
+              style={styles.scheduleIconBtn}
+              onPress={() => { setTempDate(parseCallDate(callDate)); setShowDatePicker(true); }}
+            >
+              <Feather name="calendar" size={18} color={C.night} />
+            </BounceButton>
           )}
-        </TouchableOpacity>
+
+          <TextInput
+            ref={inputRef}
+            style={styles.textInput}
+            placeholder={editingMsg ? 'Editing message...' : replyTo ? 'Type your reply...' : 'Type your message...'}
+            placeholderTextColor={C.hint}
+            value={inputText}
+            onChangeText={handleTextChange}
+            multiline
+            maxHeight={100}
+          />
+
+          <BounceButton
+            onPress={handleSend}
+            disabled={!inputText.trim() || sending}
+            style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
+          >
+            {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.sendBtnText}>Send</Text>}
+          </BounceButton>
+        </GlassBackground>
       </View>
 
       {/* ── Long-press Context Menu Modal ── */}
@@ -780,9 +782,8 @@ export default function ChatScreen({ route, navigation }) {
             top: Math.min(menuPos.y - 60, Dimensions.get('window').height - 200),
           }]}>
             {/* Reply */}
-            <TouchableOpacity
+            <BounceButton
               style={styles.menuItem}
-              activeOpacity={0.7}
               onPress={() => {
                 setReplyTo({ id: menuMsg.id, text: menuMsg.text, sender_type: menuMsg.sender_type });
                 setMenuMsg(null);
@@ -791,77 +792,39 @@ export default function ChatScreen({ route, navigation }) {
             >
               <Feather name="corner-up-left" size={18} color={C.night} />
               <Text style={styles.menuItemText}>Reply</Text>
-            </TouchableOpacity>
+            </BounceButton>
 
             {/* Delete — only for own messages */}
              {((menuMsg?.sender_type === userType) || (userType === 'seeker' && menuMsg?.sender_type === 'candidate')) && (
-              <TouchableOpacity
+              <BounceButton
                 style={styles.menuItem}
-                activeOpacity={0.7}
                 onPress={() => handleDeleteMessage(menuMsg.id)}
               >
                 <Feather name="trash-2" size={18} color="#EF4444" />
                 <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Delete</Text>
-              </TouchableOpacity>
+              </BounceButton>
             )}
 
             {/* Cancel */}
-            <TouchableOpacity
+            <BounceButton
               style={[styles.menuItem, { borderBottomWidth: 0 }]}
-              activeOpacity={0.7}
               onPress={() => setMenuMsg(null)}
             >
               <Feather name="x" size={18} color={C.muted} />
               <Text style={[styles.menuItemText, { color: C.muted }]}>Cancel</Text>
-            </TouchableOpacity>
+            </BounceButton>
           </View>
         </Pressable>
       </Modal>
 
-      {/* Schedule Call Modal — employer only */}
+      {/* Schedule Call Pickers — employer only */}
       {isEmployer && (
-        <Modal
-          visible={showScheduleModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowScheduleModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.modalTitle}>Schedule a Call</Text>
-                <Feather name="phone-call" size={18} color={C.night} />
-              </View>
-              <Text style={styles.modalDesc}>
-                Propose a date and time for a call. This will show up at the top of the chat and insert a notice.
-              </Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g. May 28 at 3:00 PM"
-                placeholderTextColor={C.hint}
-                value={scheduleInput}
-                onChangeText={setScheduleInput}
-                autoFocus
-              />
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  onPress={() => setShowScheduleModal(false)}
-                  style={[styles.modalBtn, styles.modalBtnCancel]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.modalBtnCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleScheduleConfirm}
-                  style={[styles.modalBtn, styles.modalBtnConfirm]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.modalBtnConfirmText}>Save Call</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <CustomDateTimePicker
+          visible={showDatePicker}
+          initialDate={tempDate}
+          onClose={() => setShowDatePicker(false)}
+          onConfirm={handleScheduleConfirm}
+        />
       )}
     </KeyboardAvoidingView>
   );

@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   // List layout
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   listEmpty: {
     flex: 1,
