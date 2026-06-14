@@ -4,9 +4,11 @@ import React, {
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ScrollView, ActivityIndicator, Platform,
-  KeyboardAvoidingView, Alert,
+  KeyboardAvoidingView, Alert, NativeModules
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -28,6 +30,23 @@ const C = {
 };
 
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
+
+const getBackendUrl = () => {
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+  const scriptURL = NativeModules?.SourceCode?.scriptURL;
+  if (scriptURL) {
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
+    if (match && match[1]) {
+      const host = match[1];
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        return `http://${host}:3000`;
+      }
+    }
+  }
+  return 'http://localhost:3000';
+};
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -149,7 +168,70 @@ export default function EmployerScreen({ route, navigation }) {
   const [formJobType, setFormJobType] = useState('Full-time');
   const [formCategory, setFormCategory] = useState('Tech & Software');
   const [formRemote, setFormRemote]   = useState(false);
+  const [formDescription, setFormDescription] = useState('');
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
+
+  const pulseOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (isEnhancing) {
+      pulseOpacity.value = withRepeat(
+        withSequence(withTiming(0.4, { duration: 600 }), withTiming(1, { duration: 600 })),
+        -1,
+        true
+      );
+    } else {
+      pulseOpacity.value = 1;
+    }
+  }, [isEnhancing]);
+
+  const animatedPulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
+
+  const enhanceDescription = async () => {
+    if (!formRole.trim()) {
+      Alert.alert('Role Required', 'Please enter a Job Title first so Genie knows what to write.');
+      return;
+    }
+    
+    setIsEnhancing(true);
+    setFormDescription('');
+    try {
+      const response = await fetch(`${getBackendUrl()}/api/enhance-description`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: formRole,
+          description: formDescription,
+          skills: [],
+          type: formJobType
+        })
+      });
+
+      if (!response.ok) throw new Error('Enhancement failed');
+      
+      const data = await response.json();
+      const enhancedText = data.enhancedDescription;
+      
+      const parts = enhancedText.split(/(\s+)/);
+      let i = -1;
+      let currentString = '';
+      const interval = setInterval(() => {
+        i++;
+        if (i < parts.length) {
+          currentString += parts[i];
+          setFormDescription(currentString);
+        } else {
+          clearInterval(interval);
+          setIsEnhancing(false);
+        }
+      }, 20);
+
+    } catch (err) {
+      console.warn('AI Enhancement failed', err);
+      Alert.alert('Error', 'Failed to reach AI. Please try again later.');
+      setIsEnhancing(false);
+    }
+  };
 
   const CATEGORIES = [
     'Tech & Software',
@@ -258,7 +340,7 @@ export default function EmployerScreen({ route, navigation }) {
       const randomMatch = Math.floor(Math.random() * 12) + 87; // 87% to 98%
 
       // 2. Generate standard card metadata
-      const desc = `We are seeking a talented ${formRole.trim()} to join our team. If you are passionate about building great experiences, solving meaningful problems, and working with a dynamic team, swipe right!`;
+      const desc = formDescription.trim() || `We are seeking a talented ${formRole.trim()} to join our team. If you are passionate about building great experiences, solving meaningful problems, and working with a dynamic team, swipe right!`;
       const reqs = [
         `Prior experience working as a ${formRole.trim()}`,
         "Excellent communication and team-player mindset",
@@ -322,6 +404,7 @@ export default function EmployerScreen({ route, navigation }) {
       setFormJobType('Full-time');
       setFormCategory('Tech & Software');
       setFormRemote(false);
+      setFormDescription('');
       closeSheet();
       fetchJobs(true);
     } catch (err) {
@@ -402,7 +485,7 @@ export default function EmployerScreen({ route, navigation }) {
 
       {/* Elegant FAB for New Posts */}
       <TouchableOpacity
-        style={[styles.fab, { bottom: Math.max(insets.bottom + 20, 28) }]}
+        style={[styles.fab, { bottom: insets.bottom + 78 }]}
         onPress={openSheet}
         activeOpacity={0.9}
       >
@@ -418,18 +501,14 @@ export default function EmployerScreen({ route, navigation }) {
         backdropComponent={renderBackdrop}
         handleIndicatorStyle={styles.sheetHandle}
         backgroundStyle={styles.sheetBg}
+        keyboardBehavior="extend"
       >
-        <BottomSheetView style={styles.sheetContent}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-          >
-            <BottomSheetScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 20, paddingBottom: 40 }}
-            >
-              {/* Form title */}
+        <BottomSheetScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.sheetContent, { gap: 20, paddingBottom: 40 }]}
+        >
+          {/* Form title */}
               <View style={styles.sheetHeader}>
                 <Text style={styles.sheetTitle}>Post a New Role</Text>
                 <TouchableOpacity onPress={closeSheet}>
@@ -459,8 +538,15 @@ export default function EmployerScreen({ route, navigation }) {
                     style={[styles.input, styles.salaryInput]}
                     placeholder={formJobType === 'Contract' ? "700,000" : "400,000"}
                     placeholderTextColor={C.hint}
-                    value={formSalary.replace(/[₦]/g, '')}
-                    onChangeText={setFormSalary}
+                    value={formSalary}
+                    onChangeText={(text) => {
+                      const numeric = text.replace(/[^0-9]/g, '');
+                      if (numeric) {
+                        setFormSalary(Number(numeric).toLocaleString());
+                      } else {
+                        setFormSalary('');
+                      }
+                    }}
                     autoCorrect={false}
                     keyboardType="numeric"
                   />
@@ -526,6 +612,34 @@ export default function EmployerScreen({ route, navigation }) {
                 </TouchableOpacity>
               </View>
 
+              {/* Description Input */}
+              <View style={styles.field}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.fieldLabel, { marginBottom: 0 }]}>ABOUT THE ROLE</Text>
+                  <TouchableOpacity 
+                    style={styles.aiBtn} 
+                    onPress={enhanceDescription}
+                    disabled={isEnhancing}
+                  >
+                    <LinearGradient colors={[C.orange, '#FF9A62']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.aiBtnGradient}>
+                      <Text style={styles.aiBtnText}>✨ Refine with AI</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                <Animated.View style={isEnhancing && animatedPulseStyle}>
+                  <TextInput
+                    style={[styles.input, styles.textArea, isEnhancing && { borderColor: C.orange, backgroundColor: C.peach }]}
+                    placeholder="Describe the responsibilities and what you're looking for..."
+                    placeholderTextColor={C.hint}
+                    value={formDescription}
+                    onChangeText={setFormDescription}
+                    multiline
+                    numberOfLines={4}
+                    editable={!isEnhancing}
+                  />
+                </Animated.View>
+              </View>
+
               {/* Submit button */}
               <TouchableOpacity
                 style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
@@ -539,9 +653,7 @@ export default function EmployerScreen({ route, navigation }) {
                   <Text style={styles.submitText}>Post Role Live ✨</Text>
                 )}
               </TouchableOpacity>
-            </BottomSheetScrollView>
-          </KeyboardAvoidingView>
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheet>
     </View>
   );
@@ -928,6 +1040,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: C.night,
     fontWeight: '500',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 16,
+  },
+  aiBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  aiBtnGradient: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  aiBtnText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   salaryInputContainer: {
     flexDirection: 'row',

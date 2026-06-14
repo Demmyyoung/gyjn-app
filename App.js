@@ -21,6 +21,7 @@ import MatchesScreen   from "./src/screens/MatchesScreen";
 import ProfileScreen   from "./src/screens/ProfileScreen";
 import EmployerScreen  from "./src/screens/EmployerScreen";
 import ChatScreen      from "./src/screens/ChatScreen";
+import { GlobalNotificationHandler } from "./src/lib/usePushNotifications";
 
 // ── React Query client ────────────────────────────────────────────────────────
 // Single instance for the app lifetime. Provides caching for SwipeScreen jobs
@@ -218,6 +219,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
+            <GlobalNotificationHandler />
             <NavigationContainer>
               <Stack.Navigator
                 initialRouteName="Splash"
