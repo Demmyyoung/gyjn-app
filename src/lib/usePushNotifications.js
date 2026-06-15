@@ -5,13 +5,17 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (e) {
+  console.warn('Notifications.setNotificationHandler failed (probably missing native binary packages):', e);
+}
 
 export function usePushNotifications() {
   const [expoPushToken, setExpoPushToken] = useState('');
@@ -43,18 +47,38 @@ export function usePushNotifications() {
       }
     });
 
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received in foreground:', notification);
-    });
+    try {
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        console.log('Notification received in foreground:', notification);
+      });
+    } catch (e) {
+      console.warn('Failed to add notification received listener:', e);
+    }
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('User interacted with notification:', response);
-      // Navigation logic could go here if navigation context is available
-    });
+    try {
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('User interacted with notification:', response);
+        // Navigation logic could go here if navigation context is available
+      });
+    } catch (e) {
+      console.warn('Failed to add notification response listener:', e);
+    }
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
+      try {
+        if (notificationListener.current) {
+          Notifications.removeNotificationSubscription(notificationListener.current);
+        }
+      } catch (e) {
+        console.warn('Failed to remove notification listener:', e);
+      }
+      try {
+        if (responseListener.current) {
+          Notifications.removeNotificationSubscription(responseListener.current);
+        }
+      } catch (e) {
+        console.warn('Failed to remove notification response listener:', e);
+      }
     };
   }, [userId]);
 
@@ -91,42 +115,50 @@ async function saveTokenToDatabase(token, userId) {
 async function registerForPushNotificationsAsync() {
   let token;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
+  try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to set notification channel:', e);
   }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return;
-    }
-    // Learn more about projectId:
-    // https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
-    try {
-      const projectId =
-        Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      
-      if (!projectId) {
-        console.warn('Project ID not found. Ensure app.json is configured correctly for EAS.');
+  try {
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
       }
-      
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } catch (e) {
-      token = `${e}`;
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+      // Learn more about projectId:
+      // https://docs.expo.dev/push-notifications/push-notifications-setup/#configure-projectid
+      try {
+        const projectId =
+          Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+        
+        if (!projectId) {
+          console.warn('Project ID not found. Ensure app.json is configured correctly for EAS.');
+        }
+        
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      } catch (e) {
+        token = `${e}`;
+      }
+    } else {
+      console.log('Must use physical device for Push Notifications');
     }
-  } else {
-    console.log('Must use physical device for Push Notifications');
+  } catch (e) {
+    console.warn('Error during registerForPushNotificationsAsync:', e);
   }
 
   return token;
