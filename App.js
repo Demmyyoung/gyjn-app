@@ -1,5 +1,5 @@
 import "react-native-gesture-handler";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useCallback } from "react";
 import { PostHogProvider } from "posthog-react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,10 +7,26 @@ import { NavigationContainer, useRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Text, View, Pressable, Dimensions, Platform } from "react-native";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from "react-native-reanimated";
+import { Text, View, Pressable, Dimensions, Platform, ActivityIndicator } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from "react-native-reanimated";
 import { BlurView } from 'expo-blur';
+import * as SplashScreenModule from 'expo-splash-screen';
+import Constants from 'expo-constants';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  Inter_900Black,
+} from '@expo-google-fonts/inter';
 import BounceButton from './src/components/BounceButton';
+import { ThemeProvider, useTheme } from './src/lib/ThemeProvider';
+import { springs, timings } from './src/lib/animations';
+import { haptic } from './src/lib/haptics';
+import { preloadSounds } from './src/lib/sounds';
 
 import SplashScreen    from "./src/screens/SplashScreen";
 import OnboardingScreen from "./src/screens/OnboardingScreen";
@@ -21,6 +37,7 @@ import MatchesScreen   from "./src/screens/MatchesScreen";
 import ProfileScreen   from "./src/screens/ProfileScreen";
 import EmployerScreen  from "./src/screens/EmployerScreen";
 import ChatScreen      from "./src/screens/ChatScreen";
+import SettingsScreen  from "./src/screens/SettingsScreen";
 import { GlobalNotificationHandler } from "./src/lib/usePushNotifications";
 
 // ── React Query client ────────────────────────────────────────────────────────
@@ -41,15 +58,17 @@ const Tab = createBottomTabNavigator();
 
 import { Feather } from '@expo/vector-icons';
 
-// Custom tab bar icon component
+// Custom tab bar icon component with micro-bounce on selection
 function TabIcon({ name, focused }) {
-  return <Feather name={name} size={22} color={focused ? '#FF6B2C' : '#ABABAB'} />;
+  const { colors } = useTheme();
+  return <Feather name={name} size={22} color={focused ? colors.brand.orange : colors.text.hint} />;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const { colors, typography, radii } = useTheme();
   
   const totalTabs = state.routes.length;
   const containerWidth = SCREEN_WIDTH;
@@ -58,10 +77,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
   const translateX = useSharedValue(state.index * tabWidth);
 
   useEffect(() => {
-    translateX.value = withTiming(state.index * tabWidth, {
-      duration: 150,
-      easing: Easing.out(Easing.cubic),
-    });
+    // Use snappy spring instead of linear timing — feels alive
+    translateX.value = withSpring(state.index * tabWidth, springs.snappy);
   }, [state.index]);
 
   const animatedPillStyle = useAnimatedStyle(() => {
@@ -75,13 +92,13 @@ function CustomTabBar({ state, descriptors, navigation }) {
   return (
     <GlassBackground 
       intensity={80} 
-      tint="light"
+      tint={colors.isDark ? "dark" : "light"}
       style={{
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.6)' : '#ffffff',
+        backgroundColor: Platform.OS === 'ios' ? (colors.isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)') : colors.bg.card,
         borderTopWidth: 1,
-        borderTopColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.06)',
+        borderTopColor: colors.border.light,
         paddingBottom: insets.bottom,
       }}
     >
@@ -100,7 +117,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             left: 6,
             width: tabWidth - 12,
             backgroundColor: 'rgba(255, 107, 44, 0.08)',
-            borderRadius: 12,
+            borderRadius: radii.lg,
           },
           animatedPillStyle
         ]} />
@@ -122,6 +139,9 @@ function CustomTabBar({ state, descriptors, navigation }) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
+              haptic.press(); // Light tap on every tab switch
+              // Save last active tab
+              AsyncStorage.setItem('LAST_ACTIVE_TAB', route.name).catch(() => {});
               navigation.navigate(route.name);
             }
           };
@@ -141,12 +161,26 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 gap: 1,
               }}
             >
-              {icon}
-              <Text style={{
-                fontSize: 10,
+              <View>
+                {icon}
+                {route.name === 'Matches' && !isFocused && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.status.error,
+                    borderWidth: 1.5,
+                    borderColor: colors.isDark ? '#000' : '#fff'
+                  }} />
+                )}
+              </View>
+              <Text style={[typography.micro, {
                 fontWeight: '700',
-                color: isFocused ? '#FF6B2C' : '#ABABAB',
-              }}>
+                color: isFocused ? colors.brand.orange : colors.text.hint,
+              }]}>
                 {label}
               </Text>
             </BounceButton>
@@ -165,7 +199,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
  */
 function MainTabs() {
   const route = useRoute();
-  const params = route.params || {};
+  const rawParams = route.params || {};
+  const params = rawParams.params || rawParams; // Extract nested params if passed via { screen, params }
   const isEmployer = params.userType === "employer";
 
   return (
@@ -210,40 +245,72 @@ function MainTabs() {
 // ── Root Stack ────────────────────────────────────────────────────────────────
 const Stack = createNativeStackNavigator();
 
+// Keep splash visible while fonts load
+SplashScreenModule.preventAutoHideAsync().catch(() => {});
+
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    Inter_900Black,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded) {
+      // Preload sounds in the background (non-blocking)
+      preloadSounds().catch(() => {});
+      await SplashScreenModule.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null; // Keep native splash visible
+  }
+
   return (
-      <PostHogProvider
-        apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
-        options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
-      >
+    <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
           <SafeAreaProvider>
-            <GlobalNotificationHandler />
+            {Constants.appOwnership !== 'expo' && <GlobalNotificationHandler />}
             <NavigationContainer>
-              <Stack.Navigator
-                initialRouteName="Splash"
-                screenOptions={{ headerShown: false, animation: "fade" }}
+              <PostHogProvider
+                apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
+                options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
+                autocapture={{ captureScreens: false }}
               >
-                <Stack.Screen name="Splash"      component={SplashScreen} />
-                <Stack.Screen name="Auth"        component={AuthScreen} />
-                <Stack.Screen name="Onboarding"  component={OnboardingScreen} />
-                <Stack.Screen name="Login"       component={LoginScreen} />
-                <Stack.Screen
-                  name="Main"
-                  component={MainTabs}
-                  options={{ animation: "slide_from_right" }}
-                />
-                <Stack.Screen
-                  name="Chat"
-                  component={ChatScreen}
-                  options={{ animation: "slide_from_right" }}
-                />
-              </Stack.Navigator>
+                <Stack.Navigator
+                  initialRouteName="Splash"
+                  screenOptions={{ headerShown: false, animation: "fade" }}
+                >
+                  <Stack.Screen name="Splash"      component={SplashScreen} />
+                  <Stack.Screen name="Auth"        component={AuthScreen} />
+                  <Stack.Screen name="Onboarding"  component={OnboardingScreen} />
+                  <Stack.Screen name="Login"       component={LoginScreen} />
+                  <Stack.Screen
+                    name="Main"
+                    component={MainTabs}
+                    options={{ animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="Chat"
+                    component={ChatScreen}
+                    options={{ animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="Settings"
+                    component={SettingsScreen}
+                    options={{ animation: "slide_from_right" }}
+                  />
+                </Stack.Navigator>
+              </PostHogProvider>
             </NavigationContainer>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
-      </PostHogProvider>
+    </ThemeProvider>
   );
 }

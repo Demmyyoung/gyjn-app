@@ -6,29 +6,7 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-
-const getBackendUrl = () => {
-  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-    return process.env.EXPO_PUBLIC_BACKEND_URL;
-  }
-  // Dynamically resolve your computer's local IP address from the Metro bundler URL.
-  // This ensures physical devices on the same Wi-Fi can connect to the localhost Next.js server!
-  const scriptURL = NativeModules?.SourceCode?.scriptURL;
-  if (scriptURL) {
-    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
-    if (match && match[1]) {
-      const host = match[1];
-      if (host !== 'localhost' && host !== '127.0.0.1') {
-        return `http://${host}:3000`;
-      }
-    }
-  }
-  // Emulators/Simulators fallbacks
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3000';
-  }
-  return 'http://localhost:3000';
-};
+import { getBackendUrl } from '../lib/config';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
@@ -40,6 +18,24 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { C } from '../lib/theme';
+import { useTheme } from '../lib/ThemeProvider';
+import { springs, timings } from '../lib/animations';
+import { haptic } from '../lib/haptics';
+import { playSound } from '../lib/sounds';
+import StaggeredList from '../components/StaggeredList';
+import AnimatedTag from '../components/AnimatedTag';
+import GlowButton from '../components/GlowButton';
+import BounceButton from '../components/BounceButton';
+
+// Tag color mapping for detail bottom sheet
+const TAG_COLORS = {
+  skill:    { bg: 'rgba(255, 107, 44, 0.10)', text: '#E05A00' },
+  location: { bg: 'rgba(123, 79, 233, 0.10)', text: '#6B3FD4' },
+  perk:     { bg: 'rgba(0, 200, 150, 0.10)',  text: '#00875A' },
+  level:    { bg: 'rgba(255, 179, 0, 0.10)',   text: '#B37800' },
+  default:  { bg: 'rgba(0, 0, 0, 0.05)',       text: '#555555' },
+};
 
 // Local match score calculation since we removed expensive LLM match from backend
 const calculateMatchScore = (profile, job) => {
@@ -83,21 +79,6 @@ const CARD_W = SCREEN_W - 48;
 const SWIPE_THRESHOLD = 120;
 const RISE_DISTANCE = 24;
 const CARD_HEIGHT = 420;
-
-const C = {
-  orange:  '#FF6B2C',   // primary CTA, logo, apply action, salary text
-  mango:   '#FF9A62',   // hover states, secondary orange
-  peach:   '#FFE0CC',   // pill backgrounds, light fills
-  cream:   '#FFF5EE',   // app background (replaces #F2F0ED and #F5F5F5)
-  purple:  '#7B4FE9',   // match celebration, premium badges
-  gold:    '#FFD23F',   // save action, streaks (replaces #FFD60A)
-  night:   '#1A1A2E',   // text, dark card headers (replaces #1A1A1A)
-  sand:    '#F2EDE8',   // card body background
-  green:   '#00C896',   // apply overlay, success (replaces #30D158)
-  red:     '#FF4757',   // skip overlay, destructive (replaces #FF3B30)
-  muted:   '#5A5A7A',   // body text (replaces #6B6B6B)
-  hint:    '#BEBEBE',   // placeholder, hint text
-};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -151,79 +132,66 @@ const getNotifStyle = (type) => {
   }
 };
 
-const TAG_COLORS = {
-  green:   { bg: 'rgba(0, 200, 150, 0.12)', text: C.green }, // apply-green
-  gold:    { bg: 'rgba(255, 210, 63, 0.12)', text: C.gold }, // wish-gold
-  purple:  { bg: 'rgba(123, 79, 233, 0.12)', text: C.purple }, // lamp-purple
-  default: { bg: C.peach,                text: C.muted }, // peach background
-};
-
-function Tag({ label, type }) {
-  const c = TAG_COLORS[type] || TAG_COLORS.default;
-  return (
-    <View style={[styles.tag, { backgroundColor: c.bg }]}>
-      <Text style={[styles.tagText, { color: c.text }]}>{label}</Text>
-    </View>
-  );
-}
+// AnimatedTag handles colors via theme directly
 
 // ─── JobCard (pure renderer) ────────────────────────────────────────────────
 
 function JobCard({ job, onPress, isTop }) {
-  const colors = job.colors && job.colors.length >= 2 ? job.colors : [C.orange, C.mango];
+  const { colors, typography, radii, shadows } = useTheme();
+  const bgColors = job.colors && job.colors.length >= 2 ? job.colors : [colors.brand.orange, colors.brand.mango];
 
   return (
-    <TouchableOpacity 
-      activeOpacity={0.95} 
-      onPress={onPress} 
+    <BounceButton 
+      onPress={onPress}
+      activeScale={0.98}
+      disabled={!isTop}
       style={[
         styles.card,
-        !isTop && {
-          shadowOpacity: 0,
-          elevation: 0,
-        }
+        isTop ? shadows.md : { shadowOpacity: 0, elevation: 0 }
       ]}
     >
       <View style={[
         styles.cardInner,
+        { backgroundColor: colors.bg.card },
         !isTop && {
           borderWidth: 1.5,
-          borderColor: '#F2EDE8',
+          borderColor: colors.border.light,
         }
       ]}>
         <LinearGradient
-          colors={colors}
+          colors={bgColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.cardTop}
         >
           <View style={styles.cardLogoWrap}>
-            <View style={styles.cardLogoBox}>
-              <Feather name="briefcase" size={24} color={C.night} />
+            <View style={[styles.cardLogoBox, { borderRadius: radii.xl }]}>
+              <Feather name="briefcase" size={24} color={colors.text.primary} />
             </View>
           </View>
         </LinearGradient>
-        <View style={styles.cardBottom}>
-          <Text style={styles.cardCompany}>{job.company}</Text>
-          <Text style={styles.cardRole}>{job.role}</Text>
+        
+        <View style={[styles.cardBottom, { backgroundColor: colors.bg.card }]}>
+          <Text style={[typography.caption, { color: colors.brand.orange }]}>{job.company}</Text>
+          <Text style={[typography.title, { color: colors.text.primary }]}>{job.role}</Text>
 
-          <View style={styles.cardTagsRow}>
+          <StaggeredList baseDelay={80} style={styles.cardTagsRow} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {job.tags && job.tags.slice(0, 2).map((t, idx) => (
-              <View key={idx} style={[styles.cardTag, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg }]}>
-                <Text style={[styles.cardTagText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>
-                  {t.label}
-                </Text>
-              </View>
+              <AnimatedTag 
+                key={idx} 
+                label={t.label} 
+                colorType={t.type === 'green' ? 'green' : t.type === 'purple' ? 'purple' : 'orange'} 
+              />
             ))}
-          </View>
+          </StaggeredList>
 
-          <View style={styles.cardBottomFooter}>
-            <Text style={styles.cardSalary}>{formatDisplaySalary(job.salary)}</Text>
-            <Text style={styles.tapPrompt}>Tap details ➔</Text>
+          <View style={[styles.cardBottomFooter, { borderTopColor: colors.border.light }]}>
+            <Text style={[typography.label, { color: colors.text.primary }]}>{formatDisplaySalary(job.salary)}</Text>
+            <Text style={[typography.micro, { color: colors.text.hint }]}>Tap details ➔</Text>
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+    </BounceButton>
   );
 }
 
@@ -353,13 +321,14 @@ function LeavingCard({ item, onComplete }) {
 
 /* ─── Pulsing Loading Indicator for Job Cards ─── */
 function LoadingPulse() {
+  const { colors, radii, shadows } = useTheme();
   const scale = useSharedValue(1);
 
   useEffect(() => {
     scale.value = withRepeat(
       withSequence(
-        withTiming(1.15, { duration: 800 }),
-        withTiming(1.0, { duration: 800 })
+        withTiming(1.15, timings.slow),
+        withTiming(1.0, timings.slow)
       ),
       -1,
       true
@@ -374,10 +343,10 @@ function LoadingPulse() {
 
   return (
     <View style={styles.pulseContainer}>
-      <Animated.View style={[styles.pulseCircle, animatedStyle]}>
-        <Feather name="search" size={24} color={C.orange} />
+      <Animated.View style={[styles.pulseCircle, { borderRadius: radii.full, backgroundColor: colors.bg.card }, shadows.md, animatedStyle]}>
+        <Feather name="search" size={24} color={colors.brand.orange} />
       </Animated.View>
-      <ActivityIndicator size="small" color={C.orange} style={{ marginTop: 24 }} />
+      <ActivityIndicator size="small" color={colors.brand.orange} style={{ marginTop: 24 }} />
     </View>
   );
 }
@@ -385,6 +354,7 @@ function LoadingPulse() {
 // ─── SwipeScreen ────────────────────────────────────────────────────────────
 
 export default function SwipeScreen({ route, navigation, onMatchLand }) {
+  const { colors, typography, radii, shadows } = useTheme();
   const userType = route.params?.userType || 'seeker';
   const insets = useSafeAreaInsets();
   const [jobs, setJobs] = useState([]);
@@ -950,7 +920,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       const isOver = Math.abs(translateX.value) > THRESHOLD || translateY.value > THRESHOLD;
       
       if (isOver && !hasTriggeredHaptic.value) {
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+        runOnJS(haptic.medium)();
         hasTriggeredHaptic.value = true;
       } else if (!isOver && hasTriggeredHaptic.value) {
         hasTriggeredHaptic.value = false;
@@ -970,16 +940,21 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         const targetX = isRight ? SCREEN_W * 1.5 : isLeft ? -SCREEN_W * 1.5 : 0;
         const targetY = isDown ? SCREEN_H * 1.5 : 0;
         
-        translateX.value = withTiming(targetX, { duration: 300 });
-        translateY.value = withTiming(targetY, { duration: 300 }, (finished) => {
+        runOnJS(playSound)('swipe');
+        if (dir === 'right') {
+           runOnJS(playSound)('match');
+        }
+
+        translateX.value = withTiming(targetX, timings.quick);
+        translateY.value = withTiming(targetY, timings.quick, (finished) => {
           if (finished) {
             runOnJS(handleSwipeComplete)(dir);
           }
         });
       } else {
         // Snappier, lighter spring physics to snap card back to center quickly when released
-        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
-        translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+        translateX.value = withSpring(0, springs.snappy);
+        translateY.value = withSpring(0, springs.snappy);
       }
       hasTriggeredHaptic.value = false;
     });
@@ -1037,11 +1012,11 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
       {/* Header — logo center, placeholders on sides */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <View style={{ width: 40 }} />
-        <Text style={styles.logo}>🧞‍♂️ Jinni</Text>
+        <Text style={[styles.logo, { color: colors.text.primary }]}>🧞‍♂️ Jinni</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -1053,12 +1028,12 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           pointerEvents={activeNotification ? "none" : "auto"}
         >
           <TouchableOpacity 
-            style={styles.filterBtn} 
+            style={[styles.filterBtn, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]} 
             activeOpacity={0.7}
             onPress={handleMorphingBtnPress}
           >
-            <View style={styles.filterBtnCircle}>
-              <Feather name="menu" size={16} color={C.night} />
+            <View style={[styles.filterBtnCircle, { backgroundColor: colors.bg.secondary }]}>
+              <Feather name="menu" size={16} color={colors.text.primary} />
             </View>
           </TouchableOpacity>
         </Animated.View>
@@ -1132,14 +1107,14 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         {showLoadingSpinner ? (
           <View style={styles.loadingDeck}>
             <LoadingPulse />
-            <Text style={styles.loadingTitle}>Summoning jobs...</Text>
-            <Text style={styles.loadingSubtitle}>Evaluating your CV and skills with Gemini AI</Text>
+            <Text style={[styles.loadingTitle, { color: colors.text.primary }]}>Summoning jobs...</Text>
+            <Text style={[styles.loadingSubtitle, { color: colors.text.secondary }]}>Evaluating your CV and skills with Gemini AI</Text>
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.emptyDeck}>
             <Feather name="star" size={72} color={C.orange} style={{ marginBottom: 8 }} />
-            <Text style={styles.emptyTitle}>Your wish is our command, {userName}!</Text>
-            <Text style={styles.emptySubtitle}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>Your wish is our command, {userName}!</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>But you've seen all roles for now. Check back tomorrow for more magic.</Text>
             <TouchableOpacity style={styles.reloadBtn} onPress={handleReload}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={styles.reloadBtnText}>Refresh Wishes</Text>
@@ -1163,18 +1138,18 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         enablePanDownToClose
         backdropComponent={renderBackdrop}
         onChange={handleSheetChanges}
-        handleIndicatorStyle={styles.sheetHandle}
-        backgroundStyle={styles.sheetBg2}
+        handleIndicatorStyle={[styles.sheetHandle, { backgroundColor: colors.border.medium }]}
+        backgroundStyle={[styles.sheetBg2, { backgroundColor: colors.bg.elevated }]}
       >
         <BottomSheetScrollView
           style={styles.sheetContent}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ gap: 20, paddingBottom: 110 }}
         >
           <View style={styles.sheetHeaderRow}>
-            <Text style={styles.sheetRoleHeader}>Role Details</Text>
-            <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={styles.sheetCloseBtn}>
-              <Text style={styles.sheetClose}>✕</Text>
+            <Text style={[styles.sheetRoleHeader, { color: colors.text.primary }]}>Role Details</Text>
+            <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={[styles.sheetCloseBtn, { backgroundColor: colors.bg.secondary }]}>
+              <Text style={[styles.sheetClose, { color: colors.text.secondary }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
@@ -1183,16 +1158,16 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
               <Text style={{ fontSize: 32 }}>{detailJob?.emoji || '💼'}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{detailJob?.role}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{detailJob?.role}</Text>
               <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{detailJob?.company}</Text>
             </View>
           </View>
 
           {/* Tags */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {detailJob?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{detailJob.job_type}</Text></View>}
-            {detailJob?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{formatDisplaySalary(detailJob.salary)}</Text></View>}
-            {detailJob?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{detailJob.category}</Text></View>}
+            {detailJob?.job_type && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{detailJob.job_type}</Text></View>}
+            {detailJob?.salary && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{formatDisplaySalary(detailJob.salary)}</Text></View>}
+            {detailJob?.category && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{detailJob.category}</Text></View>}
             {detailJob?.tags?.slice(0,2).map((t, i) => (
               <View key={i} style={[styles.detailPill, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg, borderColor: 'transparent' }]}>
                 <Text style={[styles.detailPillText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>{t.label}</Text>
@@ -1203,33 +1178,29 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           {/* Description */}
           {detailJob?.description && (
             <View style={{ gap: 8 }}>
-              <Text style={styles.sheetSectionLabel}>ABOUT THE ROLE</Text>
-              <Text style={styles.sheetDesc}>{detailJob.description}</Text>
+              <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>ABOUT THE ROLE</Text>
+              <Text style={[styles.sheetDesc, { color: colors.text.secondary }]}>{detailJob.description}</Text>
             </View>
           )}
 
           {/* Reqs */}
           {detailJob?.reqs && detailJob.reqs.length > 0 && (
             <View style={{ gap: 8 }}>
-              <Text style={styles.sheetSectionLabel}>REQUIREMENTS</Text>
+              <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>REQUIREMENTS</Text>
               {detailJob.reqs.map((r, i) => (
                 <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
                   <Text style={{ color: C.orange }}>•</Text>
-                  <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{r}</Text>
+                  <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22, flex: 1 }}>{r}</Text>
                 </View>
               ))}
             </View>
           )}
 
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={{ marginTop: 24 }}
+          <GlowButton
+            title="Apply via Jinni →"
             onPress={() => { closeDetail(); triggerSwipe('right'); }}
-          >
-            <View style={styles.sheetApply}>
-              <Text style={styles.sheetApplyText}>Apply via Jinni →</Text>
-            </View>
-          </TouchableOpacity>
+            style={{ marginTop: 24 }}
+          />
         </BottomSheetScrollView>
       </BottomSheet>
       </View>
@@ -1263,23 +1234,23 @@ const styles = StyleSheet.create({
 
   // Card — soft ambient shadow, no borders
   card: {
-    width: CARD_W, height: CARD_HEIGHT, borderRadius: 28,
+    width: CARD_W, height: CARD_HEIGHT, borderRadius: 36,
     backgroundColor: '#fff',
     shadowColor: C.night, shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   cardInner: {
     flex: 1,
-    borderRadius: 28,
+    borderRadius: 36,
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
   cardTop: {
     flex: 1,
     justifyContent: 'space-between',
-    padding: 20,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    padding: 24,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
   },
   matchPill: {
     alignSelf: 'flex-start',
@@ -1301,7 +1272,7 @@ const styles = StyleSheet.create({
   cardLogoBox: {
     width: 64,
     height: 64,
-    borderRadius: 18,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
@@ -1312,10 +1283,10 @@ const styles = StyleSheet.create({
   cardBottom: {
     backgroundColor: '#fff',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingVertical: 24,
     gap: 8,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
   },
   cardCompany: {
     fontSize: 12,

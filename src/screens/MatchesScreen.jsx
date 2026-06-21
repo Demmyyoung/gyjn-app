@@ -18,18 +18,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { C } from '../lib/theme';
+import { useTheme } from '../lib/ThemeProvider';
 import BounceButton from '../components/BounceButton';
-
-const C = {
-  orange:    '#FF6B2C',
-  night:     '#1A1A2E',
-  cream:     '#FFF5EE',
-  muted:     '#5A5A7A',
-  hint:      '#BEBEBE',
-  border:    '#EBEBEB',
-  peach:     '#FFE0CC',
-  lightGray: '#F7F7FA',
-};
 
 const STATUS_COLORS = {
   Applied:      { bg: 'rgba(255,107,44,0.12)', text: C.orange },
@@ -38,6 +29,7 @@ const STATUS_COLORS = {
 };
 
 function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
+  const { colors: tc } = useTheme();
   const s = STATUS_COLORS[item.status] || STATUS_COLORS.Applied;
   const canChat = item.status === 'Interviewing' || item.status === 'Hired';
 
@@ -50,7 +42,7 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
 
   return (
     <BounceButton
-      style={styles.card}
+      style={[styles.card, { backgroundColor: tc.bg.card, borderColor: tc.border.light }]}
       activeOpacity={onPress ? 0.8 : 1.0}
       activeScale={onPress ? 0.95 : 1.0}
       onPress={onPress}
@@ -71,10 +63,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
       <View style={styles.cardInfo}>
         {userType === 'employer' ? (
           <>
-            <Text style={styles.cardRole} numberOfLines={1}>
+            <Text style={[styles.cardRole, { color: tc.text.primary }]} numberOfLines={1}>
               {item.candidate_name || 'Applicant'}
             </Text>
-            <Text style={styles.cardCompany} numberOfLines={1}>
+            <Text style={[styles.cardCompany, { color: tc.brand.orange }]} numberOfLines={1}>
               {item.candidate_role || 'Professional'}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -85,10 +77,10 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
           </>
         ) : (
           <>
-            <Text style={styles.cardRole} numberOfLines={1}>
+            <Text style={[styles.cardRole, { color: tc.text.primary }]} numberOfLines={1}>
               {item.jobs?.role ?? 'Role'}
             </Text>
-            <Text style={styles.cardCompany} numberOfLines={1}>
+            <Text style={[styles.cardCompany, { color: tc.brand.orange }]} numberOfLines={1}>
               {item.jobs?.company ?? ''}{item.jobs?.job_type ? ` · ${item.jobs.job_type}` : ''}
             </Text>
           </>
@@ -192,7 +184,6 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
   };
 
   const handleUnapplyPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Un - apply',
       'Do you want to un - apply for this job?',
@@ -208,7 +199,6 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
           text: 'Un - apply',
           style: 'destructive',
           onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             startDeleteAnimation();
           },
         },
@@ -224,13 +214,12 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
 
   const handleChatNavigation = () => {
     if (!canChat) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     swipeableRef.current?.close();
     navigation.navigate('Chat', { match: item, userName, userType });
   };
 
   const handleSwipeableRightOpen = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // No-op — swipe visual feedback is sufficient
   };
 
   const renderLeftActions = (progress, dragX) => {
@@ -242,7 +231,6 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
       dragX.addListener(({ value }) => {
         if (value >= 70 && !hapticFired.current) {
           hapticFired.current = true;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         } else if (value < 70 && hapticFired.current) {
           hapticFired.current = false;
         }
@@ -412,6 +400,7 @@ export default function MatchesScreen({ route, navigation }) {
   const { userName, userType, initialSearchQuery } = route.params || {};
   const isEmployer = userType === 'employer';
   const insets = useSafeAreaInsets();
+  const { colors, shadows, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
 
   // Keep search query in sync if we navigate to this tab with new params
@@ -610,7 +599,6 @@ export default function MatchesScreen({ route, navigation }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const handleUpdateStatus = useCallback(async (matchId, newStatus) => {
     setUpdatingStatus(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const { error } = await supabase
         .from('matches')
@@ -620,7 +608,6 @@ export default function MatchesScreen({ route, navigation }) {
       // Update local selectedJob state so the sheet reflects the change immediately
       setSelectedJob((prev) => prev ? { ...prev, status: newStatus } : prev);
       refetch();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       Alert.alert('Error', `Could not update status: ${err.message}`);
     } finally {
@@ -657,11 +644,11 @@ export default function MatchesScreen({ route, navigation }) {
   const keyExtractor = useCallback((item) => String(item.match_id ?? item.id), []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Text style={styles.title}>{isEmployer ? 'Applicants' : 'Applied'}</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.text.primary }]}>{isEmployer ? 'Applicants' : 'Applied'}</Text>
+        <Text style={[styles.subtitle, { color: colors.text.hint }]}>
           {isEmployer ? (
             <>You have <Text style={styles.count}>{matches.length}</Text> applicant{matches.length !== 1 ? 's' : ''}</>
           ) : (
@@ -673,15 +660,18 @@ export default function MatchesScreen({ route, navigation }) {
       {/* Search Bar */}
       {!isLoading && matches.length > 0 && (
         <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by role or company..."
-            placeholderTextColor={C.hint}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            clearButtonMode="while-editing"
-            autoCorrect={false}
-          />
+          <View style={[styles.searchInputWrap, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}>
+            <Feather name="search" size={16} color={colors.text.hint} style={{ marginRight: 10 }} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text.primary }]}
+              placeholder="Search by role or company..."
+              placeholderTextColor={colors.text.hint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              clearButtonMode="while-editing"
+              autoCorrect={false}
+            />
+          </View>
         </View>
       )}
 
@@ -703,6 +693,7 @@ export default function MatchesScreen({ route, navigation }) {
                   onPress={() => setSelectedStage(stage)}
                   style={[
                     styles.tabPill,
+                    { backgroundColor: colors.bg.card, borderColor: colors.border.light },
                     isActive && styles.tabPillActive,
                   ]}
                 >
@@ -712,7 +703,7 @@ export default function MatchesScreen({ route, navigation }) {
                       isActive && styles.tabLabelActive,
                     ]}
                   >
-                    {stage} <Text style={[styles.tabCount, isActive && styles.tabCountActive]}>({count})</Text>
+                    {stage} <Text style={[styles.tabCount, { color: colors.text.hint }, isActive && styles.tabCountActive]}>({count})</Text>
                   </Text>
                 </TouchableOpacity>
               );
@@ -739,7 +730,6 @@ export default function MatchesScreen({ route, navigation }) {
             <RefreshControl
               refreshing={isFetching && !isLoading}
               onRefresh={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 refetch();
               }}
               tintColor={C.orange}
@@ -747,7 +737,7 @@ export default function MatchesScreen({ route, navigation }) {
           }
           ListHeaderComponent={
             filteredMatches.length > 0 ? (
-              <Text style={styles.sectionLabel}>
+              <Text style={[styles.sectionLabel, { color: colors.brand.orange }]}>
                 {selectedStage === 'All'
                   ? (isEmployer ? 'ALL APPLICANTS' : 'ALL APPLICATIONS')
                   : `${selectedStage.toUpperCase()} (${filteredMatches.length})`}
@@ -756,8 +746,8 @@ export default function MatchesScreen({ route, navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Feather name="star" size={72} color={C.orange} style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyTitle}>
+              <Feather name="star" size={72} color={colors.brand.orange} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>
                 {searchQuery || selectedStage !== 'All' ? 'No matches found' : 'No wishes granted yet'}
               </Text>
               <Text style={styles.emptyHint}>
@@ -779,19 +769,19 @@ export default function MatchesScreen({ route, navigation }) {
         snapPoints={snapPoints}
         enablePanDownToClose
         backdropComponent={renderBackdrop}
-        handleIndicatorStyle={styles.sheetHandle}
-        backgroundStyle={styles.sheetBg}
+        handleIndicatorStyle={[styles.sheetHandle, { backgroundColor: colors.border.medium }]}
+        backgroundStyle={[styles.sheetBg, { backgroundColor: colors.bg.elevated }]}
         style={{ zIndex: 9999, elevation: 100 }}
       >
         {selectedJob && (
-          <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 40 }}>
+          <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 110 }}>
               {isEmployer ? (
                 // ── Employer View: Candidate Profile ──────────────────────
                 <>
                   <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Candidate Profile</Text>
+                    <Text style={[styles.sheetTitle, { color: colors.text.primary }]}>Candidate Profile</Text>
                     <TouchableOpacity onPress={closeSheet}>
-                      <Feather name="x" size={24} color={C.hint} />
+                      <Feather name="x" size={24} color={colors.text.hint} />
                     </TouchableOpacity>
                   </View>
 
@@ -802,27 +792,27 @@ export default function MatchesScreen({ route, navigation }) {
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.candidate_name || 'Applicant'}</Text>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: C.muted, marginTop: 2 }}>{selectedJob.candidate_role || 'Professional'}</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{selectedJob.candidate_name || 'Applicant'}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text.secondary, marginTop: 2 }}>{selectedJob.candidate_role || 'Professional'}</Text>
                       <View style={{ flexDirection: 'row', marginTop: 6 }}>
-                        <View style={{ backgroundColor: '#F7F7FA', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#EBEBEB' }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#5A5A7A' }}>Applied for: {selectedJob.jobs?.role}</Text>
+                        <View style={{ backgroundColor: colors.bg.secondary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: colors.border.light }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.text.secondary }}>Applied for: {selectedJob.jobs?.role}</Text>
                         </View>
                       </View>
                     </View>
                   </View>
 
                   {/* AI Recruiter Insights */}
-                  <View style={{ backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#EBEBEB', padding: 16, position: 'relative' }}>
+                  <View style={{ backgroundColor: colors.bg.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.light, padding: 16, position: 'relative' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: C.orange, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand.orange, letterSpacing: 0.5, textTransform: 'uppercase' }}>
                         AI Recruiter Insights
                       </Text>
                       {selectedJob.ai_summary && !analyzing && (
                         <TouchableOpacity onPress={() => generateAiRecommendation(true)}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: C.hint }}>Regenerate</Text>
-                            <Feather name="refresh-cw" size={11} color={C.hint} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.hint }}>Regenerate</Text>
+                            <Feather name="refresh-cw" size={11} color={colors.text.hint} />
                           </View>
                         </TouchableOpacity>
                       )}
@@ -848,19 +838,19 @@ export default function MatchesScreen({ route, navigation }) {
                     ) : selectedJob.ai_summary ? (
                       <View style={{ gap: 12 }}>
                         <View>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.muted, marginBottom: 4 }}>Profile & CV Summary</Text>
-                          <Text style={{ fontSize: 14, color: C.night, lineHeight: 20 }}>{selectedJob.ai_summary}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 }}>Profile & CV Summary</Text>
+                          <Text style={{ fontSize: 14, color: colors.text.primary, lineHeight: 20 }}>{selectedJob.ai_summary}</Text>
                         </View>
-                        <View style={{ backgroundColor: C.cream, borderRadius: 10, padding: 12, borderLeftWidth: 3, borderLeftColor: C.orange }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: C.night, marginBottom: 2 }}>Recruiter's Take</Text>
-                          <Text style={{ fontSize: 13, color: C.muted, lineHeight: 18, fontWeight: '500' }}>{selectedJob.ai_opinion}</Text>
+                        <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 10, padding: 12, borderLeftWidth: 3, borderLeftColor: colors.brand.orange }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary, marginBottom: 2 }}>Recruiter's Take</Text>
+                          <Text style={{ fontSize: 13, color: colors.text.secondary, lineHeight: 18, fontWeight: '500' }}>{selectedJob.ai_opinion}</Text>
                         </View>
                       </View>
                     ) : (
-                      <View style={{ alignItems: 'center', paddingVertical: 16, borderWidth: 1.5, borderColor: '#EBEBEB', borderStyle: 'dashed', borderRadius: 12 }}>
-                        <Text style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>No AI evaluation available yet.</Text>
+                      <View style={{ alignItems: 'center', paddingVertical: 16, borderWidth: 1.5, borderColor: colors.border.light, borderStyle: 'dashed', borderRadius: 12 }}>
+                        <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 10 }}>No AI evaluation available yet.</Text>
                         <TouchableOpacity 
-                          style={{ backgroundColor: C.orange, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
+                          style={{ backgroundColor: colors.brand.orange, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
                           onPress={() => generateAiRecommendation(true)}
                         >
                           <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Generate Insights</Text>
@@ -872,19 +862,19 @@ export default function MatchesScreen({ route, navigation }) {
                   {/* About */}
                   {selectedJob.about_me ? (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT</Text>
-                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.about_me}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.secondary, letterSpacing: 1 }}>ABOUT</Text>
+                      <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22 }}>{selectedJob.about_me}</Text>
                     </View>
                   ) : null}
 
                   {/* Skills */}
                   {selectedJob.skills && selectedJob.skills.length > 0 ? (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>SKILLS</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.secondary, letterSpacing: 1 }}>SKILLS</Text>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                         {selectedJob.skills.map((skill, i) => (
-                          <View key={i} style={styles.detailPill || { backgroundColor: '#F7F7FA', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#EBEBEB' }}>
-                            <Text style={styles.detailPillText || { fontSize: 12, color: C.night, fontWeight: '600' }}>{skill}</Text>
+                          <View key={i} style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}>
+                            <Text style={[styles.detailPillText, { color: colors.text.secondary }]}>{skill}</Text>
                           </View>
                         ))}
                       </View>
@@ -954,46 +944,46 @@ export default function MatchesScreen({ route, navigation }) {
                 // ── Seeker View: Job Details ──────────────────────
                 <>
                   <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Role Details</Text>
+                    <Text style={[styles.sheetTitle, { color: colors.text.primary }]}>Role Details</Text>
                     <TouchableOpacity onPress={closeSheet}>
-                      <Text style={styles.sheetClose}>✕</Text>
+                      <Text style={[styles.sheetClose, { color: colors.text.hint }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-                    <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || C.peach, borderColor: 'transparent' }]}>
-                      <Feather name="briefcase" size={32} color={C.night} />
+                    <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || colors.brand.peach, borderColor: 'transparent' }]}>
+                      <Feather name="briefcase" size={32} color={colors.text.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 22, fontWeight: '900', color: C.night }}>{selectedJob.jobs?.role}</Text>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{selectedJob.jobs?.company}</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{selectedJob.jobs?.role}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.brand.orange, marginTop: 4 }}>{selectedJob.jobs?.company}</Text>
                     </View>
                   </View>
                   
                   {/* Tags */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.status || 'Applied'}</Text></View>
-                    {selectedJob.jobs?.job_type && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.job_type}</Text></View>}
-                    {selectedJob.jobs?.salary && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.salary}</Text></View>}
-                    {selectedJob.jobs?.category && <View style={styles.detailPill}><Text style={styles.detailPillText}>{selectedJob.jobs?.category}</Text></View>}
+                    <View style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.secondary }]}>{selectedJob.status || 'Applied'}</Text></View>
+                    {selectedJob.jobs?.job_type && <View style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.secondary }]}>{selectedJob.jobs?.job_type}</Text></View>}
+                    {selectedJob.jobs?.salary && <View style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.secondary }]}>{selectedJob.jobs?.salary}</Text></View>}
+                    {selectedJob.jobs?.category && <View style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.secondary }]}>{selectedJob.jobs?.category}</Text></View>}
                   </View>
 
                   {/* Description */}
                   {selectedJob.jobs?.description && (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>ABOUT THE ROLE</Text>
-                      <Text style={{ fontSize: 15, color: C.night, lineHeight: 22 }}>{selectedJob.jobs.description}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.secondary, letterSpacing: 1 }}>ABOUT THE ROLE</Text>
+                      <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22 }}>{selectedJob.jobs.description}</Text>
                     </View>
                   )}
 
                   {/* Reqs */}
                   {selectedJob.jobs?.reqs && selectedJob.jobs.reqs.length > 0 && (
                     <View style={{ gap: 8 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: C.muted, letterSpacing: 1 }}>REQUIREMENTS</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text.secondary, letterSpacing: 1 }}>REQUIREMENTS</Text>
                       {selectedJob.jobs.reqs.map((req, i) => (
                         <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
-                          <Text style={{ color: C.orange }}>•</Text>
-                          <Text style={{ fontSize: 15, color: C.night, lineHeight: 22, flex: 1 }}>{req}</Text>
+                          <Text style={{ color: colors.brand.orange }}>•</Text>
+                          <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22, flex: 1 }}>{req}</Text>
                         </View>
                       ))}
                     </View>
@@ -1015,7 +1005,7 @@ export default function MatchesScreen({ route, navigation }) {
                     </TouchableOpacity>
                   ) : (
                     <View style={{ marginTop: 20, padding: 16, backgroundColor: 'rgba(255,107,44,0.06)', borderRadius: 16, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 14, color: C.orange, fontWeight: '700' }}>Application pending review</Text>
+                      <Text style={{ fontSize: 14, color: colors.brand.orange, fontWeight: '700' }}>Application pending review</Text>
                     </View>
                   )}
                 </>
@@ -1074,20 +1064,26 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginTop: 4,
   },
-  searchInput: {
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 14,
-    color: C.night,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.05)',
     shadowColor: C.night,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
     elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.night,
+    padding: 0,
   },
 
   // Tabs
@@ -1102,7 +1098,7 @@ const styles = StyleSheet.create({
   tabPill: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.03)',
@@ -1151,11 +1147,11 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    backgroundColor: '#fff', borderRadius: 22, padding: 16,
+    backgroundColor: '#fff', borderRadius: 24, padding: 16,
     flexDirection: 'row', alignItems: 'center', gap: 14,
     shadowColor: C.night, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.015)',
+    shadowOpacity: 0.05, shadowRadius: 12, elevation: 2,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.02)',
   },
   swipeableItemWrap: {
     overflow: 'hidden',
@@ -1190,10 +1186,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   logoBox: {
-    width: 54, height: 54, borderRadius: 16,
-    backgroundColor: 'rgba(255,107,44,0.1)',
+    width: 54, height: 54, borderRadius: 27,
+    backgroundColor: 'rgba(255,107,44,0.08)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,107,44,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,107,44,0.12)',
   },
   logoEmoji: { fontSize: 24 },
   cardInfo:    { flex: 1 },

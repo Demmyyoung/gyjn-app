@@ -8,6 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
+import { C } from '../lib/theme';
+import { getBackendUrl } from '../lib/config';
 
 // Base64 to ArrayBuffer decoder for React Native uploads
 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -46,16 +48,6 @@ function decodeBase64(base64) {
   return arrayBuffer;
 }
 
-const C = {
-  orange:  '#FF6B2C',
-  mango:   '#FF9A62',
-  peach:   '#FFE0CC',
-  cream:   '#FFF5EE',
-  night:   '#1A1A2E',
-  muted:   '#5A5A7A',
-  hint:    '#BEBEBE',
-};
-
 const ALL_SKILLS = [
   'JavaScript', 'TypeScript', 'React', 'React Native', 'Next.js',
   'Node.js', 'Python', 'SQL', 'Figma', 'UI/UX Design',
@@ -75,24 +67,6 @@ const CATEGORIES = [
   { name: 'Supply Chain & Logistics', emoji: '📦' },
   { name: 'Other', emoji: '💼' }
 ];
-
-const getBackendUrl = () => {
-  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-    return process.env.EXPO_PUBLIC_BACKEND_URL;
-  }
-  // Dynamically resolve Metro host
-  const scriptURL = NativeModules?.SourceCode?.scriptURL;
-  if (scriptURL) {
-    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
-    if (match && match[1]) {
-      const host = match[1];
-      if (host !== 'localhost' && host !== '127.0.0.1') {
-        return `http://${host}:3000`;
-      }
-    }
-  }
-  return 'http://localhost:3000';
-};
 
 import { NativeModules } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, withSpring } from 'react-native-reanimated';

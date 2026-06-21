@@ -1,75 +1,76 @@
 import React, { useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Pressable
+  View, Text, StyleSheet, SafeAreaView
 } from 'react-native';
 import Animated, { 
   useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence, withSpring 
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
-
-const C = {
-  orange:  '#FF6B2C',
-  mango:   '#FF9A62',
-  night:   '#1A1A2E',
-  cream:   '#FFF5EE',
-  hint:    '#BEBEBE',
-  muted:   '#5A5A7A',
-};
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { useTheme } from '../lib/ThemeProvider';
+import { springs, timings } from '../lib/animations';
+import StaggeredList from '../components/StaggeredList';
+import BounceButton from '../components/BounceButton';
 
 function SelectionCard({ emoji, label, desc, onPress, colorTheme }) {
-  const isPressed = useSharedValue(false);
+  const { colors, typography, radii, shadows } = useTheme();
+  const isHovered = useSharedValue(false);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: withSpring(isPressed.value ? 0.98 : 1) }],
-      shadowOpacity: withTiming(isPressed.value ? 0.15 : 0.04),
-      shadowColor: isPressed.value ? C.orange : C.night,
-      borderColor: withTiming(isPressed.value ? 'rgba(255,107,44,0.4)' : 'rgba(0,0,0,0.015)'),
+      borderColor: isHovered.value ? colors.brand.orange : colors.border.light,
+      backgroundColor: colors.bg.card,
     };
   });
 
   const arrowStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateX: withTiming(isPressed.value ? 5 : 0) }]
+      transform: [{ translateX: withSpring(isHovered.value ? 5 : 0, springs.snappy) }]
     };
   });
 
   return (
-    <AnimatedPressable
-      style={[styles.card, animatedStyle]}
-      onPressIn={() => isPressed.value = true}
-      onPressOut={() => isPressed.value = false}
+    <BounceButton
       onPress={onPress}
+      onPressIn={() => isHovered.value = true}
+      onPressOut={() => isHovered.value = false}
+      activeScale={0.97}
+      style={{ marginBottom: 16 }}
     >
-      <View style={styles.cardLeft}>
-        <View style={[styles.emojiBox, { backgroundColor: colorTheme }]}>
-          <Text style={styles.cardEmoji}>{emoji}</Text>
+      <Animated.View style={[styles.card, { borderRadius: radii['2xl'] }, shadows.sm, animatedStyle]}>
+        <View style={styles.cardLeft}>
+          <View style={[styles.emojiBox, { backgroundColor: colorTheme, borderRadius: radii.lg }]}>
+            <Text style={styles.cardEmoji}>{emoji}</Text>
+          </View>
+          <View style={styles.cardTextContainer}>
+            <Text style={[typography.title, { color: colors.text.primary }]}>{label}</Text>
+            <Text style={[typography.label, { color: colors.text.secondary }]}>{desc}</Text>
+          </View>
         </View>
-        <View style={styles.cardTextContainer}>
-          <Text style={styles.cardLabel}>{label}</Text>
-          <Text style={styles.cardDesc}>{desc}</Text>
-        </View>
-      </View>
-      <Animated.View style={[styles.arrowContainer, arrowStyle]}>
-        <LinearGradient colors={[C.orange, C.mango]} style={styles.arrowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <Text style={styles.cardArrow}>➔</Text>
-        </LinearGradient>
+        <Animated.View style={[styles.arrowContainer, arrowStyle]}>
+          <LinearGradient 
+            colors={[colors.brand.orange, colors.brand.mango]} 
+            style={[styles.arrowGradient, { borderRadius: radii.circle }]} 
+            start={{ x: 0, y: 0 }} 
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.cardArrow}>➔</Text>
+          </LinearGradient>
+        </Animated.View>
       </Animated.View>
-    </AnimatedPressable>
+    </BounceButton>
   );
 }
 
 export default function OnboardingScreen({ navigation }) {
+  const { colors, typography } = useTheme();
   const rocketOffset = useSharedValue(0);
 
   useEffect(() => {
     rocketOffset.value = withRepeat(
       withSequence(
-        withTiming(-5, { duration: 1000 }),
-        withTiming(0, { duration: 1000 })
+        withTiming(-5, timings.slow),
+        withTiming(0, timings.slow)
       ),
       -1,
       true
@@ -81,20 +82,24 @@ export default function OnboardingScreen({ navigation }) {
   }));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
       <SafeAreaView style={styles.inner}>
+        
         <View style={styles.header}>
           <View style={styles.titleRow}>
-            <Text style={styles.title}>You're almost{'\n'}in. </Text>
+            <Text style={[typography.display, { color: colors.text.primary }]}>
+              You're almost{'\n'}in. 
+            </Text>
             <Animated.Text style={[styles.rocket, rocketStyle]}>🚀</Animated.Text>
           </View>
-          <Text style={styles.subtitle}>
+          <Text style={[typography.body, { color: colors.text.secondary, marginTop: 8 }]}>
             Tell us who you are so we can{'\n'}personalise your experience.
           </Text>
         </View>
 
-        <View style={styles.cards}>
+        <StaggeredList baseDelay={100} style={styles.cards}>
           <SelectionCard
+            key="seeker"
             emoji="🧑‍💻"
             label="Job Seeker"
             desc="Swipe on jobs, get matched, land interviews"
@@ -102,13 +107,14 @@ export default function OnboardingScreen({ navigation }) {
             onPress={() => navigation.navigate('Auth', { role: 'seeker' })}
           />
           <SelectionCard
+            key="employer"
             emoji="🏢"
             label="Employer"
             desc="Post roles, discover talent, hire fast"
             colorTheme="rgba(123, 79, 233, 0.08)"
             onPress={() => navigation.navigate('Auth', { role: 'employer' })}
           />
-        </View>
+        </StaggeredList>
 
       </SafeAreaView>
     </View>
@@ -116,7 +122,7 @@ export default function OnboardingScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.cream },
+  container: { flex: 1 },
   inner: {
     flex: 1,
     paddingHorizontal: 20,
@@ -125,34 +131,17 @@ const styles = StyleSheet.create({
   },
   header: { gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: C.night,
-    lineHeight: 42,
-  },
   rocket: {
     fontSize: 34,
     lineHeight: 42,
     marginLeft: 4,
   },
-  subtitle: {
-    fontSize: 15,
-    color: C.muted,
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  cards: { gap: 16 },
+  cards: { marginTop: 16 },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 2,
     borderWidth: 1.5,
   },
   cardLeft: {
@@ -164,25 +153,17 @@ const styles = StyleSheet.create({
   emojiBox: {
     width: 60,
     height: 60,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardEmoji: { fontSize: 30 },
   cardTextContainer: { flex: 1, gap: 2 },
-  cardLabel: { fontSize: 17, fontWeight: '800', color: C.night },
-  cardDesc: { fontSize: 13, color: C.muted, lineHeight: 18 },
   arrowContainer: { paddingLeft: 8 },
   arrowGradient: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: C.orange,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   cardArrow: { fontSize: 16, color: '#fff', fontWeight: '800' },
 });

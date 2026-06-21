@@ -8,27 +8,17 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import CustomDateTimePicker from '../components/CustomDateTimePicker';
 import { BlurView } from 'expo-blur';
 import BounceButton from '../components/BounceButton';
 import { supabase } from '../lib/supabase';
+import { C } from '../lib/theme';
+import { useTheme } from '../lib/ThemeProvider';
 
-const C = {
-  orange:  '#FF6B2C',
-  peach:   '#FFE0CC',
-  cream:   '#FFF5EE',
-  night:   '#1A1A2E',
-  muted:   '#5A5A7A',
-  hint:    '#BEBEBE',
-  border:  '#EBEBEB',
-  lightBg: '#F7F7FA',
-};
+const C_COMPAT = { ...C, border: '#EBEBEB', lightBg: '#F7F7FA' };
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -81,6 +71,7 @@ function TypingDots() {
 }
 
 export default function ChatScreen({ route, navigation }) {
+  const { colors, isDark } = useTheme();
   const { match, userName, userType: rawUserType } = route.params || {};
   const userType = rawUserType === 'candidate' ? 'seeker' : rawUserType;
   const isEmployer = userType === 'employer';
@@ -113,12 +104,15 @@ export default function ChatScreen({ route, navigation }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Reply state
   const [replyTo, setReplyTo] = useState(null);
+  const replyBarAnim = useRef(new RNAnimated.Value(0)).current;
 
   // Edit state
   const [editingMsg, setEditingMsg] = useState(null);
+  const editBarAnim = useRef(new RNAnimated.Value(0)).current;
   const lastTapRefs = useRef({});
 
   // Long-press context menu
@@ -207,7 +201,6 @@ export default function ChatScreen({ route, navigation }) {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `match_id=eq.${matchId}`,
       }, (payload) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setMessages((prev) => {
           if (prev.some((msg) => msg.id === payload.new.id)) return prev;
           return [...prev, payload.new];
@@ -228,17 +221,14 @@ export default function ChatScreen({ route, navigation }) {
         event: 'DELETE', schema: 'public', table: 'messages',
         filter: `match_id=eq.${matchId}`,
       }, (payload) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         const isRemote = payload?.sender !== userType && !(userType === 'seeker' && payload?.sender === 'candidate');
         if (isRemote) {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setRemoteIsTyping(true);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
           typingTimeoutRef.current = setTimeout(() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             setRemoteIsTyping(false);
           }, 3000);
         }
@@ -257,36 +247,109 @@ export default function ChatScreen({ route, navigation }) {
     };
   }, [matchId, fetchMessages, userType]);
 
+  // Debounced scroll-to-bottom helper — prevents multiple competing scroll calls
+  const scrollTimer = useRef(null);
+  const scrollToBottom = useCallback((animated = true) => {
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    }, 80);
+  }, []);
+
   // Auto scroll on new messages
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+      scrollToBottom();
     }
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
-  // Keyboard scroll listener
+  // Android: smoothly animate keyboard height since KAV is unreliable
+  const androidKeyboardAnim = useRef(new RNAnimated.Value(0)).current;
+
   useEffect(() => {
-    const sub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        if (messages.length > 0) {
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 50);
-        }
-      }
-    );
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      RNAnimated.spring(androidKeyboardAnim, {
+        toValue: e.endCoordinates.height,
+        useNativeDriver: false,
+        tension: 180,
+        friction: 24,
+      }).start();
+      scrollToBottom();
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      RNAnimated.spring(androidKeyboardAnim, {
+        toValue: 0,
+        useNativeDriver: false,
+        tension: 180,
+        friction: 24,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, [scrollToBottom]);
+
+  // Keyboard scroll listener (iOS)
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = Keyboard.addListener('keyboardWillShow', () => {
+      scrollToBottom();
+    });
     return () => sub.remove();
-  }, [messages]);
+  }, [scrollToBottom]);
 
   // Auto scroll to show remote user's typing dots
   useEffect(() => {
     if (remoteIsTyping && messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
+      scrollToBottom();
     }
-  }, [remoteIsTyping, messages.length]);
+  }, [remoteIsTyping, messages.length, scrollToBottom]);
+
+  // Animate reply bar slide up
+  useEffect(() => {
+    if (replyTo) {
+      replyBarAnim.setValue(40);
+      RNAnimated.spring(replyBarAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 20,
+      }).start();
+    }
+  }, [replyTo]);
+
+  // Animate edit bar slide up
+  useEffect(() => {
+    if (editingMsg) {
+      editBarAnim.setValue(40);
+      RNAnimated.spring(editBarAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 20,
+      }).start();
+    }
+  }, [editingMsg]);
+
+  // Animated dismiss for reply bar
+  const dismissReply = useCallback(() => {
+    RNAnimated.timing(replyBarAnim, {
+      toValue: 40,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => setReplyTo(null));
+  }, [replyBarAnim]);
+
+  // Animated dismiss for edit bar
+  const dismissEdit = useCallback(() => {
+    RNAnimated.timing(editBarAnim, {
+      toValue: 40,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      setEditingMsg(null);
+      setInputText('');
+    });
+  }, [editBarAnim]);
 
   // ── Broadcast typing (throttled 2s) ──
   const broadcastTyping = useCallback(() => {
@@ -346,7 +409,6 @@ export default function ChatScreen({ route, navigation }) {
       reply_to: replyId,
       created_at: new Date().toISOString(),
     };
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
@@ -613,33 +675,43 @@ export default function ChatScreen({ route, navigation }) {
 
   const GlassBackground = Platform.OS === 'ios' ? BlurView : View;
 
+  const Wrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+  const wrapperProps = Platform.OS === 'ios' 
+    ? { behavior: 'padding', keyboardVerticalOffset: headerHeight }
+    : {};
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+      <Wrapper
+        style={[styles.container, { backgroundColor: colors.bg.primary }]}
+        {...wrapperProps}
+      >
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Top Glass Area: Header + Call Bar */}
-      <GlassBackground intensity={85} tint="light" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.65)' : '#ffffff' }}>
+      <GlassBackground 
+        intensity={isDark ? 30 : 85} 
+        tint={isDark ? "dark" : "light"} 
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.65)') : colors.bg.card }}
+      >
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 12), backgroundColor: 'transparent', borderBottomWidth: 0 }]}>
           <BounceButton onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>←</Text>
+            <Text style={[styles.backBtnText, { color: colors.text.primary }]}>←</Text>
           </BounceButton>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle} numberOfLines={1}>{recipientName}</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>{jobTitle}</Text>
+            <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>{recipientName}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]} numberOfLines={1}>{jobTitle}</Text>
           </View>
           <View style={{ width: 36 }} />
         </View>
 
         <View style={[styles.callBar, { backgroundColor: 'transparent' }]}>
           <View style={styles.callBarInfo}>
-            <Text style={styles.callBarLabel}>CALL SCHEDULE</Text>
+            <Text style={[styles.callBarLabel, { color: colors.text.hint }]}>CALL SCHEDULE</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Feather name={callDate ? "phone-call" : "calendar"} size={12} color={C.night} />
-              <Text style={styles.callBarValue}>{displayCallDate}</Text>
+              <Feather name={callDate ? "phone-call" : "calendar"} size={12} color={colors.text.primary} />
+              <Text style={[styles.callBarValue, { color: colors.text.primary }]}>{displayCallDate}</Text>
             </View>
           </View>
           {isEmployer && (
@@ -664,96 +736,94 @@ export default function ChatScreen({ route, navigation }) {
           <ActivityIndicator color={C.orange} size="large" />
         </View>
       ) : (
-        <View style={StyleSheet.absoluteFill}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
+        <FlatList
+          style={{ flex: 1 }}
+          ref={flatListRef}
+          data={messages}
           renderItem={renderMessageItem}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 100, paddingBottom: insets.bottom + 120 }]}
+          contentContainerStyle={[styles.listContent, { paddingTop: headerHeight || insets.top + 100, paddingBottom: 16 }]}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={20}
           onLayout={() => {
             if (messages.length > 0) {
               if (isInitialLayout.current) {
                 flatListRef.current?.scrollToEnd({ animated: false });
                 isInitialLayout.current = false;
-              } else {
-                setTimeout(() => {
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }, 50);
               }
             }
           }}
           onContentSizeChange={() => {
-            if (messages.length > 0) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 50);
+            if (messages.length > 0 && !isInitialLayout.current) {
+              scrollToBottom();
             }
           }}
         />
-        </View>
       )}
       
-      {/* Spacer to push Bottom Area down */}
-      <View style={{ flex: 1 }} pointerEvents="none" />
-
       {/* Typing indicator (Moved outside scroll area) */}
       {remoteIsTyping && <TypingDots />}
 
       {/* Bottom Glass Area: Reply/Edit + Input Bar */}
-      <View style={{ width: '100%' }}>
+      <RNAnimated.View style={{ width: '100%', paddingBottom: Platform.OS === 'android' ? androidKeyboardAnim : 0 }}>
         {/* Reply Preview Bar */}
         {replyTo && !editingMsg && (
-          <GlassBackground intensity={85} tint="light" style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}>
-            <View style={styles.replyBarAccent} />
-            <View style={styles.replyBarContent}>
-              <Text style={styles.replyBarSender}>
-                 Replying to {replyTo.sender_type === userType || (userType === 'seeker' && replyTo.sender_type === 'candidate') ? 'yourself' : recipientName}
-              </Text>
-              <Text style={styles.replyBarText} numberOfLines={1}>{replyTo.text}</Text>
-            </View>
-            <BounceButton onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setReplyTo(null); }} style={styles.replyBarClose}>
-              <Text style={styles.replyBarCloseText}>✕</Text>
-            </BounceButton>
-          </GlassBackground>
+          <RNAnimated.View style={{ transform: [{ translateY: replyBarAnim }], opacity: replyBarAnim.interpolate({ inputRange: [0, 40], outputRange: [1, 0] }) }}>
+            <GlassBackground intensity={isDark ? 30 : 85} tint={isDark ? "dark" : "light"} style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)') : colors.bg.card }]}>
+              <View style={styles.replyBarAccent} />
+              <View style={styles.replyBarContent}>
+                <Text style={[styles.replyBarSender, { color: colors.text.secondary }]}>
+                   Replying to {replyTo.sender_type === userType || (userType === 'seeker' && replyTo.sender_type === 'candidate') ? 'yourself' : recipientName}
+                </Text>
+                <Text style={[styles.replyBarText, { color: colors.text.primary }]} numberOfLines={1}>{replyTo.text}</Text>
+              </View>
+              <BounceButton onPress={dismissReply} style={[styles.replyBarClose, { backgroundColor: colors.bg.secondary }]}>
+                <Text style={[styles.replyBarCloseText, { color: colors.text.primary }]}>✕</Text>
+              </BounceButton>
+            </GlassBackground>
+          </RNAnimated.View>
         )}
 
         {/* Edit Preview Bar */}
         {editingMsg && (
-          <GlassBackground intensity={85} tint="light" style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}>
-            <View style={[styles.replyBarAccent, { backgroundColor: C.orange }]} />
-            <View style={styles.replyBarContent}>
-              <Text style={[styles.replyBarSender, { color: C.orange }]}>Editing Message</Text>
-              <Text style={styles.replyBarText} numberOfLines={1}>{editingMsg.text}</Text>
-            </View>
-            <BounceButton onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setEditingMsg(null); setInputText(''); }} style={styles.replyBarClose}>
-              <Text style={styles.replyBarCloseText}>✕</Text>
-            </BounceButton>
-          </GlassBackground>
+          <RNAnimated.View style={{ transform: [{ translateY: editBarAnim }], opacity: editBarAnim.interpolate({ inputRange: [0, 40], outputRange: [1, 0] }) }}>
+            <GlassBackground intensity={isDark ? 30 : 85} tint={isDark ? "dark" : "light"} style={[styles.replyBar, { backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)') : colors.bg.card }]}>
+              <View style={[styles.replyBarAccent, { backgroundColor: C.orange }]} />
+              <View style={styles.replyBarContent}>
+                <Text style={[styles.replyBarSender, { color: C.orange }]}>Editing Message</Text>
+                <Text style={[styles.replyBarText, { color: colors.text.primary }]} numberOfLines={1}>{editingMsg.text}</Text>
+              </View>
+              <BounceButton onPress={dismissEdit} style={[styles.replyBarClose, { backgroundColor: colors.bg.secondary }]}>
+                <Text style={[styles.replyBarCloseText, { color: colors.text.primary }]}>✕</Text>
+              </BounceButton>
+            </GlassBackground>
+          </RNAnimated.View>
         )}
 
         {/* Footer Input Bar */}
         <GlassBackground
-          intensity={85} tint="light"
+          intensity={isDark ? 30 : 85} tint={isDark ? "dark" : "light"}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: Platform.OS === 'ios' ? 'rgba(255,255,255,0.7)' : '#ffffff' }]}
+          style={[styles.inputBar, { paddingBottom: 12, backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)') : colors.bg.card }]}
         >
           {isEmployer && (
             <BounceButton
-              style={styles.scheduleIconBtn}
+              style={[styles.scheduleIconBtn, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}
               onPress={() => { setTempDate(parseCallDate(callDate)); setShowDatePicker(true); }}
             >
-              <Feather name="calendar" size={18} color={C.night} />
+              <Feather name="calendar" size={18} color={colors.text.primary} />
             </BounceButton>
           )}
 
           <TextInput
             ref={inputRef}
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light, color: colors.text.primary }]}
             placeholder={editingMsg ? 'Editing message...' : replyTo ? 'Type your reply...' : 'Type your message...'}
-            placeholderTextColor={C.hint}
+            placeholderTextColor={colors.text.hint}
             value={inputText}
             onChangeText={handleTextChange}
             multiline
@@ -768,7 +838,7 @@ export default function ChatScreen({ route, navigation }) {
             {sending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.sendBtnText}>Send</Text>}
           </BounceButton>
         </GlassBackground>
-      </View>
+      </RNAnimated.View>
 
       {/* ── Long-press Context Menu Modal ── */}
       <Modal
@@ -826,7 +896,8 @@ export default function ChatScreen({ route, navigation }) {
           onConfirm={handleScheduleConfirm}
         />
       )}
-    </KeyboardAvoidingView>
+      </Wrapper>
+    </SafeAreaView>
   );
 }
 

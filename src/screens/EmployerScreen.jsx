@@ -12,41 +12,10 @@ import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, w
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
-
-// ─── Design Tokens ───────────────────────────────────────────────────────────
-const C = {
-  orange:    '#FF6B2C',
-  peach:     '#FFE0CC',
-  cream:     '#FFF5EE',   // Background tint
-  night:     '#1A1A2E',   // Main dark text
-  muted:     '#5A5A7A',   // Secondary text
-  hint:      '#A0A0C0',   // Placeholders
-  green:     '#00C896',   // Active state
-  red:       '#FF4757',   // Closed state
-  border:    '#F2EDE8',   // Light dividers
-  card:      '#FFFFFF',   // Card background
-  shadow:    'rgba(26, 26, 46, 0.05)',
-  lightGray: '#F7F7FA',
-};
+import { C } from '../lib/theme';
+import { getBackendUrl } from '../lib/config';
 
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
-
-const getBackendUrl = () => {
-  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
-    return process.env.EXPO_PUBLIC_BACKEND_URL;
-  }
-  const scriptURL = NativeModules?.SourceCode?.scriptURL;
-  if (scriptURL) {
-    const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
-    if (match && match[1]) {
-      const host = match[1];
-      if (host !== 'localhost' && host !== '127.0.0.1') {
-        return `http://${host}:3000`;
-      }
-    }
-  }
-  return 'http://localhost:3000';
-};
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {

@@ -1,25 +1,68 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring, 
+  withTiming, 
+  withDelay,
+  Easing
+} from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../lib/ThemeProvider';
+import { springs, timings } from '../lib/animations';
 
 const { width } = Dimensions.get('window');
 
-export default function SplashScreen({ navigation }) {
-  const scale = new Animated.Value(0.5);
-  const opacity = new Animated.Value(0);
-  const progress = new Animated.Value(0);
+// Helper to animate individual letters
+const AnimatedLetter = ({ letter, index }) => {
+  const { colors, typography } = useTheme();
+  const translateY = useSharedValue(20);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, friction: 5, tension: 100, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-    ]).start();
+    // Stagger each letter by 100ms
+    const delay = 300 + (index * 80);
+    translateY.value = withDelay(delay, withSpring(0, springs.bouncy));
+    opacity.value = withDelay(delay, withTiming(1, timings.quick));
+  }, []);
 
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 2000,
-      useNativeDriver: false,
-    }).start();
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.Text style={[styles.wordmark, typography.hero, { color: colors.brand.orange }, style]}>
+      {letter}
+    </Animated.Text>
+  );
+};
+
+export default function SplashScreen({ navigation }) {
+  const { colors, typography, radii } = useTheme();
+  
+  // Icon animation
+  const iconScale = useSharedValue(0);
+  const iconOpacity = useSharedValue(0);
+  
+  // Tagline and footer animation
+  const fadeUpTranslate = useSharedValue(15);
+  const fadeUpOpacity = useSharedValue(0);
+
+  // Progress bar animation
+  const progressWidth = useSharedValue(0);
+
+  useEffect(() => {
+    // Initial entrance animations
+    iconScale.value = withSpring(1, springs.elastic);
+    iconOpacity.value = withTiming(1, timings.normal);
+    
+    fadeUpTranslate.value = withDelay(800, withSpring(0, springs.snappy));
+    fadeUpOpacity.value = withDelay(800, withTiming(1, timings.normal));
+
+    progressWidth.value = withDelay(1000, withTiming(60, { duration: 2000, easing: Easing.inOut(Easing.ease) }));
 
     // Helper: wraps a promise with a timeout so we never hang indefinitely
     const withTimeout = (promise, ms) =>
@@ -30,71 +73,65 @@ export default function SplashScreen({ navigation }) {
         ),
       ]);
 
-    const navigate = (timer) => {
-      clearTimeout(timer);
-    };
-
     // Hard failsafe: if anything takes longer than 6 seconds total, go to Onboarding
     const hardTimeout = setTimeout(() => {
       console.warn('[Splash] Hard timeout hit — navigating to Onboarding');
       navigation.replace('Onboarding');
     }, 6000);
 
-    const timer = setTimeout(async () => {
+    // Fetch data immediately alongside the animation
+    const fetchSessionAndNavigate = async () => {
       try {
-        const { data: { session } } = await withTimeout(
-          supabase.auth.getSession(),
-          4000  // 4 s max for session fetch
-        );
+        const [sessionRes] = await Promise.all([
+          withTimeout(supabase.auth.getSession(), 4000), // max 4s for auth
+          new Promise(r => setTimeout(r, 1000))          // min 1s animation time
+        ]);
+        
+        const { data: { session } } = sessionRes;
 
         if (session) {
-          // Check employer profile first (2 s timeout per query)
           let data = null;
           let userType = 'employer';
 
           try {
             const empRes = await withTimeout(
-              supabase
-                .from('employer_profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single(),
-              2000
+              supabase.from('employer_profiles').select('*').eq('id', session.user.id).single(),
+              1500
             );
             data = empRes.data;
-          } catch (_) {
-            // timeout or error — try seeker below
-          }
+          } catch (_) {}
 
           if (!data) {
             try {
               const seekerRes = await withTimeout(
-                supabase
-                  .from('seeker_profiles')
-                  .select('*')
-                  .eq('id', session.user.id)
-                  .single(),
-                2000
+                supabase.from('seeker_profiles').select('*').eq('id', session.user.id).single(),
+                1500
               );
               data = seekerRes.data;
               userType = 'seeker';
-            } catch (_) {
-              // timeout or error — fall through to Onboarding
-            }
+            } catch (_) {}
           }
 
           clearTimeout(hardTimeout);
           if (data && data.user_name) {
+            let lastTab = null;
+            try {
+              lastTab = await AsyncStorage.getItem('LAST_ACTIVE_TAB');
+            } catch (e) {}
+
             navigation.replace('Main', {
-              userName:    data.user_name,
-              userRole:    data.user_role || data.job_type,
-              jobType:     data.job_type,
-              aboutMe:     data.about_me,
-              searchTarget: data.search_target,
-              userType:    userType,
-              skills:      data.skills || [],
-              cvUrl:       data.cv_url,
-              category:    data.category,
+              screen: lastTab || 'Discover',
+              params: {
+                userName: data.user_name,
+                userRole: data.user_role || data.job_type,
+                jobType: data.job_type,
+                aboutMe: data.about_me,
+                searchTarget: data.search_target,
+                userType: userType,
+                skills: data.skills || [],
+                cvUrl: data.cv_url,
+                category: data.category,
+              }
             });
           } else {
             navigation.replace('Onboarding');
@@ -108,38 +145,73 @@ export default function SplashScreen({ navigation }) {
         clearTimeout(hardTimeout);
         navigation.replace('Onboarding');
       }
-    }, 2400);
+    };
+
+    fetchSessionAndNavigate();
 
     return () => {
-      clearTimeout(timer);
       clearTimeout(hardTimeout);
     };
   }, []);
 
-  const barWidth = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: iconOpacity.value,
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  const fadeUpStyle = useAnimatedStyle(() => ({
+    opacity: fadeUpOpacity.value,
+    transform: [{ translateY: fadeUpTranslate.value }],
+  }));
+
+  const progressStyle = useAnimatedStyle(() => ({
+    width: progressWidth.value,
+  }));
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.content, { opacity, transform: [{ scale }] }]}>
-        <View style={styles.iconBox}>
+    <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
+      <View style={styles.content}>
+        <Animated.View 
+          style={[
+            styles.iconBox, 
+            { 
+              backgroundColor: 'rgba(255, 107, 44, 0.1)',
+              borderColor: 'rgba(255, 107, 44, 0.2)',
+              borderRadius: radii['2xl']
+            }, 
+            iconStyle
+          ]}
+        >
           <Text style={styles.icon}>💼</Text>
+        </Animated.View>
+        
+        {/* Letter by letter Wordmark */}
+        <View style={styles.wordmarkContainer}>
+          {'Jinni'.split('').map((letter, index) => (
+            <AnimatedLetter key={index} letter={letter} index={index} />
+          ))}
         </View>
-        {/* Wordmark and Tagline */}
-        <Text style={styles.wordmark}>Jinni</Text>
-        <Text style={styles.tagline}>MAKE A WISH. GET YOUR JOB.</Text>
-      </Animated.View>
+        
+        <Animated.Text 
+          style={[
+            styles.tagline, 
+            typography.caption, 
+            { color: colors.text.hint }, 
+            fadeUpStyle
+          ]}
+        >
+          MAKE A WISH. GET YOUR JOB.
+        </Animated.Text>
+      </View>
 
-      <View style={styles.loaderTrack}>
-        <Animated.View style={[styles.loaderBar, { width: barWidth }]} />
+      <View style={[styles.loaderTrack, { backgroundColor: colors.border.light }]}>
+        <Animated.View style={[styles.loaderBar, { backgroundColor: colors.brand.orange }, progressStyle]} />
       </View>
 
       {/* Powered by Brand Footer */}
-      <Animated.View style={[styles.footer, { opacity }]}>
-        <Text style={styles.footerText}>powered by</Text>
-        <Text style={styles.footerBrand}>KODx</Text>
+      <Animated.View style={[styles.footer, fadeUpStyle]}>
+        <Text style={[typography.micro, { color: colors.text.hint }]}>powered by</Text>
+        <Text style={[typography.micro, { color: colors.brand.orange, letterSpacing: 0.5 }]}>KODx</Text>
       </Animated.View>
     </View>
   );
@@ -150,7 +222,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF5EE',
   },
   content: {
     alignItems: 'center',
@@ -159,25 +230,19 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 90,
     height: 90,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 107, 44, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 107, 44, 0.2)',
     marginBottom: 4,
   },
   icon: { fontSize: 48 },
+  wordmarkContainer: {
+    flexDirection: 'row',
+  },
   wordmark: {
-    fontSize: 46,
-    fontWeight: '900',
-    color: '#FF6B2C',
-    letterSpacing: -1,
+    // Extra styling handled in AnimatedLetter via theme
   },
   tagline: {
-    fontSize: 12,
-    color: '#ABABAB',
-    fontWeight: '600',
     letterSpacing: 3,
   },
   loaderTrack: {
@@ -185,13 +250,11 @@ const styles = StyleSheet.create({
     bottom: 96,
     width: 60,
     height: 3,
-    backgroundColor: 'rgba(26,26,26,0.1)',
     borderRadius: 10,
     overflow: 'hidden',
   },
   loaderBar: {
     height: '100%',
-    backgroundColor: '#FF6B2C',
     borderRadius: 10,
   },
   footer: {
@@ -200,17 +263,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  footerText: {
-    fontSize: 11,
-    color: '#ABABAB',
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  footerBrand: {
-    fontSize: 12,
-    color: '#FF6B2C',
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
 });

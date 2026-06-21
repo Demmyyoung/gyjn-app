@@ -5,16 +5,18 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-} catch (e) {
-  console.warn('Notifications.setNotificationHandler failed (probably missing native binary packages):', e);
+if (Constants.appOwnership !== 'expo') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (e) {
+    console.warn('Notifications.setNotificationHandler failed (probably missing native binary packages):', e);
+  }
 }
 
 export function usePushNotifications() {
@@ -67,14 +69,14 @@ export function usePushNotifications() {
     return () => {
       try {
         if (notificationListener.current) {
-          Notifications.removeNotificationSubscription(notificationListener.current);
+          notificationListener.current.remove();
         }
       } catch (e) {
         console.warn('Failed to remove notification listener:', e);
       }
       try {
         if (responseListener.current) {
-          Notifications.removeNotificationSubscription(responseListener.current);
+          responseListener.current.remove();
         }
       } catch (e) {
         console.warn('Failed to remove notification response listener:', e);

@@ -4,15 +4,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-
-const C = {
-  orange: '#FF6B2C',
-  night: '#1A1A2E',
-  muted: '#5A5A7A',
-  cream: '#FFF5EE',
-  border: '#EBEBEB',
-  lightBg: '#F7F7FA',
-};
+import { C } from '../lib/theme';
 
 const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();

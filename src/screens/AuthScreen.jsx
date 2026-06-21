@@ -11,19 +11,10 @@ import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { C } from '../lib/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const C = {
-  orange:  '#FF6B2C',
-  mango:   '#FF9A62',
-  peach:   '#FFE0CC',
-  cream:   '#FFF5EE',
-  night:   '#1A1A2E',
-  muted:   '#5A5A7A',
-  hint:    '#BEBEBE',
-};
 
 export default function AuthScreen({ navigation, route }) {
   const [email, setEmail] = useState('');
