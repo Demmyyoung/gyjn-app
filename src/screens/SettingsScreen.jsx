@@ -273,6 +273,22 @@ export default function SettingsScreen({ navigation, route }) {
   };
 
   const saveEdit = async (forcedDraft = draft) => {
+    if (!forcedDraft.name?.trim()) {
+      Alert.alert('Required Field', 'Please enter your name.');
+      return;
+    }
+
+    if (!isEmployer && !cvUrl) {
+      const aboutLen = (forcedDraft.about || '').trim().length;
+      if (aboutLen < 500) {
+        Alert.alert(
+          'More Context Required',
+          `Since you haven't uploaded a CV, your 'About You' section must be at least 500 characters (currently ${aboutLen}/500) so our AI has enough details about your background to match you.`
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -475,6 +491,15 @@ export default function SettingsScreen({ navigation, route }) {
   };
 
   const deleteCV = () => {
+    const aboutLen = (draft.about || '').trim().length;
+    if (!isEmployer && aboutLen < 500) {
+      Alert.alert(
+        'Cannot Remove CV',
+        `To remove your CV, your 'About You' section must first be at least 500 characters (currently ${aboutLen}/500) to ensure the AI has enough context to match you.`
+      );
+      return;
+    }
+
     Alert.alert('Remove CV', 'Remove your uploaded CV?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -743,15 +768,22 @@ export default function SettingsScreen({ navigation, route }) {
                   <SkeletonPulse style={{ height: 110, borderRadius: 16, width: '100%' }} />
                 </View>
               ) : (
-                <AnimatedInput
-                  label="About You"
-                  value={draft.about}
-                  onChangeText={v => setDraft(p => ({ ...p, about: v }))}
-                  placeholder="Tell recruiters about yourself..."
-                  multiline={true}
-                  showsVerticalScrollIndicator={true}
-                  labelBgColor={colors.bg.elevated}
-                />
+                <>
+                  <AnimatedInput
+                    label="About You"
+                    value={draft.about}
+                    onChangeText={v => setDraft(p => ({ ...p, about: v }))}
+                    placeholder="Tell recruiters about yourself..."
+                    multiline={true}
+                    showsVerticalScrollIndicator={true}
+                    labelBgColor={colors.bg.elevated}
+                  />
+                  {!isEmployer && !cvUrl && (
+                    <Text style={{ fontSize: 11, color: (draft.about || '').trim().length >= 500 ? colors.status.success : colors.status.error, textAlign: 'right', marginTop: -8, marginBottom: 12 }}>
+                      {(draft.about || '').trim().length} / 500 characters minimum
+                    </Text>
+                  )}
+                </>
               )}
 
               {/* Job Type */}

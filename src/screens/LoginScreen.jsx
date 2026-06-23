@@ -305,6 +305,15 @@ export default function LoginScreen({ navigation, route }) {
     }
     
     if (!isEmployer && !cvUrl) {
+      const aboutLen = (aboutMe || '').trim().length;
+      if (aboutLen < 500) {
+        Alert.alert(
+          'More Context Required',
+          `Since you haven't uploaded a CV, your 'About You' section must be at least 500 characters (currently ${aboutLen}/500) so our AI has enough details about your background to match you.`
+        );
+        return;
+      }
+      
       Alert.alert(
         '⚠️ Heads up!',
         'Without a CV, our matching algorithm has less information to work with. Your match scores may be lower than candidates with a full profile.',
@@ -438,6 +447,11 @@ export default function LoginScreen({ navigation, route }) {
                 editable={!aiParsing}
               />
             </Animated.View>
+            {!isEmployer && !cvUrl && (
+              <Text style={{ fontSize: 11, color: (aboutMe || '').trim().length >= 500 ? C.green : C.red, textAlign: 'right', marginTop: 4 }}>
+                {(aboutMe || '').trim().length} / 500 characters minimum
+              </Text>
+            )}
           </View>
 
           {/* Job type (seekers) / Search target (employers) */}
