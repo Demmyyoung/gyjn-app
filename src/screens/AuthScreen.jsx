@@ -159,6 +159,7 @@ export default function AuthScreen({ navigation, route }) {
               skills:      empData.skills || [],
               cvUrl:       empData.cv_url,
               category:    empData.category,
+              companyName: empData.company_name,
             }
           }],
         });

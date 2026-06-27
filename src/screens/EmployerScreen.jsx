@@ -129,7 +129,7 @@ function EmptyState({ onPost }) {
 
 // ─── EmployerScreen ──────────────────────────────────────────────────────────
 export default function EmployerScreen({ route, navigation }) {
-  const { userName, userRole } = route.params || {};
+  const { userName, userRole, companyName } = route.params || {};
   const insets = useSafeAreaInsets();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export default function EmployerScreen({ route, navigation }) {
   const [formCategory, setFormCategory] = useState('Tech & Software');
   const [formRemote, setFormRemote]   = useState(false);
   const [formDescription, setFormDescription] = useState('');
-  const [formCompany, setFormCompany] = useState('');
+  const [formCompany, setFormCompany] = useState(companyName || '');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
 
@@ -379,7 +379,7 @@ export default function EmployerScreen({ route, navigation }) {
       setFormCategory('Tech & Software');
       setFormRemote(false);
       setFormDescription('');
-      setFormCompany('');
+      setFormCompany(companyName || '');
       closeSheet();
       fetchJobs(true);
     } catch (err) {
