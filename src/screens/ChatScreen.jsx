@@ -70,6 +70,110 @@ function TypingDots() {
   );
 }
 
+const MessageItem = React.memo(({ 
+  item, 
+  userType, 
+  repliedMsg, 
+  isLatestOwnMsg, 
+  recipientName, 
+  lastTapRefs, 
+  onEditMessage, 
+  onLongPress, 
+  onSwipeReply,
+  renderLeftActions,
+  renderRightActions,
+  swipeableRef
+}) => {
+  if (item.sender_type === 'system') {
+    return (
+      <View style={styles.systemMsgRow}>
+        <View style={styles.systemMsgBubble}>
+          <Text style={styles.systemMsgText}>{item.text}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const isMine = item.sender_type === userType || (userType === 'seeker' && item.sender_type === 'candidate');
+
+  const bubble = (
+    <View style={{ width: '100%', marginBottom: (isMine && isLatestOwnMsg) ? 14 : 0 }}>
+      <Pressable
+        onPress={() => {
+          const now = Date.now();
+          const lastTap = lastTapRefs.current[item.id] || 0;
+          if (now - lastTap < 300) {
+            if (isMine) {
+              onEditMessage(item);
+            }
+          }
+          lastTapRefs.current[item.id] = now;
+        }}
+        onLongPress={(evt) => onLongPress(item, evt)}
+        delayLongPress={400}
+        style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
+      >
+        <View
+          style={[
+            styles.msgBubble,
+            isMine ? styles.msgBubbleRight : styles.msgBubbleLeft,
+          ]}
+        >
+          {repliedMsg && (
+            <View style={[
+              styles.replyQuote,
+              isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs,
+            ]}>
+              <Text style={[styles.replyQuoteSender, isMine && { color: 'rgba(255,255,255,0.8)' }]}>
+                {repliedMsg.sender_type === userType || (userType === 'seeker' && repliedMsg.sender_type === 'candidate') ? 'You' : recipientName}
+              </Text>
+              <Text
+                style={[styles.replyQuoteText, isMine && { color: 'rgba(255,255,255,0.7)' }]}
+                numberOfLines={2}
+              >
+                {repliedMsg.text}
+              </Text>
+            </View>
+          )}
+
+          <Text style={[styles.msgText, isMine ? styles.msgTextRight : styles.msgTextLeft]}>
+            {item.text}
+          </Text>
+          <Text style={[styles.msgTime, isMine ? styles.msgTimeRight : styles.msgTimeLeft]}>
+            {item.is_edited && <Text style={{ fontStyle: 'italic' }}>(edited) </Text>}
+            {new Date(item.created_at).toLocaleTimeString([], {
+              hour: '2-digit', minute: '2-digit',
+            })}
+          </Text>
+        </View>
+      </Pressable>
+      {isMine && isLatestOwnMsg && (
+        <Text style={{ fontSize: 10, color: C.muted, position: 'absolute', bottom: -12, right: 8, fontWeight: '500' }}>
+          {item.status === 'seen' ? 'Seen' : item.status === 'delivered' ? 'Delivered' : 'Sent'}
+        </Text>
+      )}
+    </View>
+  );
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderLeftActions={!isMine ? renderLeftActions : undefined}
+      renderRightActions={isMine ? renderRightActions : undefined}
+      onSwipeableLeftWillOpen={!isMine ? () => onSwipeReply(item) : undefined}
+      onSwipeableRightWillOpen={isMine ? () => onSwipeReply(item) : undefined}
+      overshootLeft={!isMine}
+      overshootRight={isMine}
+      friction={2}
+      overshootFriction={8}
+      leftThreshold={60}
+      rightThreshold={60}
+    >
+      {bubble}
+    </Swipeable>
+  );
+});
+
 export default function ChatScreen({ route, navigation }) {
   const { colors, isDark } = useTheme();
   const { match, userName, userType: rawUserType } = route.params || {};
@@ -480,15 +584,15 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   // ── Swipe-to-reply ──
-  const handleSwipeReply = (msg) => {
+  const handleSwipeReply = useCallback((msg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     setReplyTo({ id: msg.id, text: msg.text, sender_type: msg.sender_type });
     swipeableRefs.current[msg.id]?.close();
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-  };
+  }, []);
 
-  const renderLeftActions = (progress, dragX) => {
+  const renderLeftActions = useCallback((progress, dragX) => {
     const scale = dragX.interpolate({
       inputRange: [0, 20, 60, 100],
       outputRange: [0.3, 0.5, 1, 1],
@@ -525,9 +629,9 @@ export default function ChatScreen({ route, navigation }) {
         </RNAnimated.View>
       </View>
     );
-  };
+  }, []);
 
-  const renderRightActions = (progress, dragX) => {
+  const renderRightActions = useCallback((progress, dragX) => {
     const scale = dragX.interpolate({
       inputRange: [-100, -60, -20, 0],
       outputRange: [1, 1, 0.5, 0.3],
@@ -564,114 +668,44 @@ export default function ChatScreen({ route, navigation }) {
         </RNAnimated.View>
       </View>
     );
-  };
+  }, []);
 
   // ── Long-press handler ──
-  const handleLongPress = (msg, evt) => {
+  const handleLongPress = useCallback((msg, evt) => {
     // Don't allow long-press on system messages
     if (msg.sender_type === 'system') return;
     const { pageY } = evt.nativeEvent;
     setMenuMsg(msg);
     setMenuPos({ x: SCREEN_WIDTH / 2, y: pageY });
-  };
+  }, []);
+
+  const handleEditMessage = useCallback((item) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+    setEditingMsg(item);
+    setInputText(item.text);
+    inputRef.current?.focus();
+  }, []);
 
   // ── Render message bubble ──
-  const renderMessageItem = ({ item }) => {
-    if (item.sender_type === 'system') {
-      return (
-        <View style={styles.systemMsgRow}>
-          <View style={styles.systemMsgBubble}>
-            <Text style={styles.systemMsgText}>{item.text}</Text>
-          </View>
-        </View>
-      );
-    }
-
-    const isMine = item.sender_type === userType || (userType === 'seeker' && item.sender_type === 'candidate');
-    const repliedMsg = item.reply_to ? msgMap[item.reply_to] : null;
-
-    const bubble = (
-      <View style={{ width: '100%', marginBottom: (isMine && item.id === latestOwnMsgId) ? 14 : 0 }}>
-        <Pressable
-          onPress={() => {
-            const now = Date.now();
-            const lastTap = lastTapRefs.current[item.id] || 0;
-            if (now - lastTap < 300) {
-              if (isMine) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
-                setEditingMsg(item);
-                setInputText(item.text);
-                inputRef.current?.focus();
-              }
-            }
-            lastTapRefs.current[item.id] = now;
-          }}
-          onLongPress={(evt) => handleLongPress(item, evt)}
-          delayLongPress={400}
-          style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
-        >
-          <View
-            style={[
-              styles.msgBubble,
-              isMine ? styles.msgBubbleRight : styles.msgBubbleLeft,
-            ]}
-          >
-            {/* Reply quote */}
-            {repliedMsg && (
-              <View style={[
-                styles.replyQuote,
-                isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs,
-              ]}>
-                <Text style={[styles.replyQuoteSender, isMine && { color: 'rgba(255,255,255,0.8)' }]}>
-                  {repliedMsg.sender_type === userType || (userType === 'seeker' && repliedMsg.sender_type === 'candidate') ? 'You' : recipientName}
-                </Text>
-                <Text
-                  style={[styles.replyQuoteText, isMine && { color: 'rgba(255,255,255,0.7)' }]}
-                  numberOfLines={2}
-                >
-                  {repliedMsg.text}
-                </Text>
-              </View>
-            )}
-
-            <Text style={[styles.msgText, isMine ? styles.msgTextRight : styles.msgTextLeft]}>
-              {item.text}
-            </Text>
-            <Text style={[styles.msgTime, isMine ? styles.msgTimeRight : styles.msgTimeLeft]}>
-              {item.is_edited && <Text style={{ fontStyle: 'italic' }}>(edited) </Text>}
-              {new Date(item.created_at).toLocaleTimeString([], {
-                hour: '2-digit', minute: '2-digit',
-              })}
-            </Text>
-          </View>
-        </Pressable>
-        {isMine && item.id === latestOwnMsgId && (
-          <Text style={{ fontSize: 10, color: C.muted, position: 'absolute', bottom: -12, right: 8, fontWeight: '500' }}>
-            {item.status === 'seen' ? 'Seen' : item.status === 'delivered' ? 'Delivered' : 'Sent'}
-          </Text>
-        )}
-      </View>
-    );
-
+  const renderMessageItem = useCallback(({ item }) => {
     return (
-      <Swipeable
-        ref={(ref) => { swipeableRefs.current[item.id] = ref; }}
-        renderLeftActions={!isMine ? renderLeftActions : undefined}
-        renderRightActions={isMine ? renderRightActions : undefined}
-        onSwipeableLeftWillOpen={!isMine ? () => handleSwipeReply(item) : undefined}
-        onSwipeableRightWillOpen={isMine ? () => handleSwipeReply(item) : undefined}
-        overshootLeft={!isMine}
-        overshootRight={isMine}
-        friction={2}
-        overshootFriction={8}
-        leftThreshold={60}
-        rightThreshold={60}
-      >
-        {bubble}
-      </Swipeable>
+      <MessageItem
+        item={item}
+        userType={userType}
+        repliedMsg={item.reply_to ? msgMap[item.reply_to] : null}
+        isLatestOwnMsg={item.id === latestOwnMsgId}
+        recipientName={recipientName}
+        lastTapRefs={lastTapRefs}
+        onEditMessage={handleEditMessage}
+        onLongPress={handleLongPress}
+        onSwipeReply={handleSwipeReply}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        swipeableRef={(ref) => { swipeableRefs.current[item.id] = ref; }}
+      />
     );
-  };
+  }, [userType, msgMap, latestOwnMsgId, recipientName, handleEditMessage, handleLongPress, handleSwipeReply, renderLeftActions, renderRightActions]);
 
   const GlassBackground = Platform.OS === 'ios' ? BlurView : View;
 

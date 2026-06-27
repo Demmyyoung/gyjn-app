@@ -17,6 +17,7 @@ const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import { ICON_MAP } from '../lib/icons';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { useTheme } from '../lib/ThemeProvider';
@@ -28,7 +29,7 @@ const STATUS_COLORS = {
   Hired:        { bg: 'rgba(0,200,150,0.12)',  text: '#00C896' },
 };
 
-function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
+const MatchCard = React.memo(function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
   const { colors: tc } = useTheme();
   const s = STATUS_COLORS[item.status] || STATUS_COLORS.Applied;
   const canChat = item.status === 'Interviewing' || item.status === 'Hired';
@@ -55,7 +56,12 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
             {(item.candidate_name || 'U').substring(0, 1).toUpperCase()}
           </Text>
         ) : (
-          <Feather name="briefcase" size={24} color={C.night} />
+          (() => {
+            const emojiVal = item.jobs?.emoji || 'briefcase';
+            const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+            const IconComp = iconData.fam;
+            return <IconComp name={iconData.name} size={24} color={C.night} />;
+          })()
         )}
       </View>
 
@@ -121,12 +127,12 @@ function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
       </View>
     </BounceButton>
   );
-}
+});
 
 // Custom wrapper to manage row-level gesture state and exit animations.
 // It is written with React Native Reanimated to ensure smooth 60fps/120fps animations.
 // Reanimated runs animations directly on the UI thread, bypassing the React JS thread.
-function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigation, userName, userType }) {
+const SwipeableRow = React.memo(function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigation, userName, userType }) {
   const swipeableRef = useRef(null);
   const hapticFired = useRef(false);
   const dragXRef = useRef(null);
@@ -336,9 +342,9 @@ function SwipeableRow({ item, isNew, onUnapplyConfirmed, onOpenDetails, navigati
       </Swipeable>
     </Animated.View>
   );
-}
+});
 
-function MatchCardSkeleton({ animatedStyle }) {
+const MatchCardSkeleton = React.memo(function MatchCardSkeleton({ animatedStyle }) {
   return (
     <Animated.View style={[styles.card, animatedStyle]}>
       {/* Logo Box Placeholder */}
@@ -356,9 +362,9 @@ function MatchCardSkeleton({ animatedStyle }) {
       </View>
     </Animated.View>
   );
-}
+});
 
-function MatchesSkeleton() {
+const MatchesSkeleton = React.memo(function MatchesSkeleton() {
   const opacity = useSharedValue(0.4);
 
   useEffect(() => {
@@ -394,7 +400,7 @@ function MatchesSkeleton() {
       </View>
     </View>
   );
-}
+});
 
 export default function MatchesScreen({ route, navigation }) {
   const { userName, userType, initialSearchQuery } = route.params || {};
@@ -952,7 +958,12 @@ export default function MatchesScreen({ route, navigation }) {
 
                   <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
                     <View style={[styles.logoBox, { width: 64, height: 64, backgroundColor: selectedJob.jobs?.colors?.[1] || colors.brand.peach, borderColor: 'transparent' }]}>
-                      <Feather name="briefcase" size={32} color={colors.text.primary} />
+                      {(() => {
+                        const emojiVal = selectedJob.jobs?.emoji || 'briefcase';
+                        const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+                        const IconComp = iconData.fam;
+                        return <IconComp name={iconData.name} size={32} color={colors.text.primary} />;
+                      })()}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{selectedJob.jobs?.role}</Text>

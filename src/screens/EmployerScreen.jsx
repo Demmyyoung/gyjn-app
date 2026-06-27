@@ -14,8 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { getBackendUrl } from '../lib/config';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ICON_MAP, ICON_OPTIONS } from '../lib/icons';
 
-const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship'];
+const JOB_TYPES = ['Full-time', 'Part-time', 'Contract / Freelance', 'Internship'];
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -50,21 +52,25 @@ const JobCard = React.memo(function JobCard({ item, onPress }) {
   const swipeCount = item.swipe_count ?? 0;
   
   // Default values matching standard design in candidate swiper
-  const cardEmoji = item.emoji || '💼';
+  const emojiVal = item.emoji || 'briefcase';
   const lightBgColor = item.colors?.[1] || C.peach;
+  const darkColor = item.colors?.[0] || C.orange;
+  
+  const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+  const IconComp = iconData.fam;
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
       {/* Upper row: logo, role title, and status */}
       <View style={styles.cardHeaderRow}>
         <View style={[styles.cardLogoBox, { backgroundColor: lightBgColor }]}>
-          <Text style={styles.cardLogoText}>{cardEmoji}</Text>
+          <IconComp name={iconData.name} size={22} color={darkColor} />
         </View>
 
         <View style={styles.cardRoleContainer}>
           <Text style={styles.cardRoleText} numberOfLines={1}>{item.role ?? 'Untitled Role'}</Text>
           <View style={styles.cardMetaRow}>
-            <Text style={styles.cardCompanyText}>{item.company || 'My Company'}</Text>
+            <Text style={styles.cardCompanyText}>{item.company || 'Freelance'}</Text>
             <Text style={styles.cardMetaDot}>•</Text>
             <Text style={styles.cardMetaText}>{item.job_type || 'Full-time'}</Text>
           </View>
@@ -134,10 +140,12 @@ export default function EmployerScreen({ route, navigation }) {
   // Form state
   const [formRole, setFormRole]       = useState('');
   const [formSalary, setFormSalary]   = useState('');
+  const [formIcon, setFormIcon]       = useState('briefcase');
   const [formJobType, setFormJobType] = useState('Full-time');
   const [formCategory, setFormCategory] = useState('Tech & Software');
   const [formRemote, setFormRemote]   = useState(false);
   const [formDescription, setFormDescription] = useState('');
+  const [formCompany, setFormCompany] = useState('');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [submitting, setSubmitting]   = useState(false);
 
@@ -295,10 +303,6 @@ export default function EmployerScreen({ route, navigation }) {
     }
     setSubmitting(true);
     try {
-      // 1. Generate elegant visual fallbacks matching swipe-screen requirements
-      const emojis = ['💻', '🚀', '📈', '🎨', '💼', '🛠️', '⚙️', '🎯', '✍️', '💡', '🧪', '👾'];
-      const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-
       const colorSchemes = [
         ['#FF6B2C', '#FFE0CC'], // Jinni Orange
         ['#7B4FE9', '#EBE5FC'], // Jinni Purple
@@ -322,7 +326,7 @@ export default function EmployerScreen({ route, navigation }) {
         const isNumeric = /^\d+$/.test(cleaned);
         if (isNumeric) {
           const formattedAmount = Number(cleaned).toLocaleString();
-          if (formJobType === 'Contract' || formJobType === 'Internship') {
+          if (formJobType === 'Contract / Freelance' || formJobType === 'Internship') {
             finalSalary = `₦${formattedAmount}`;
           } else {
             finalSalary = `₦${formattedAmount}/mo`;
@@ -352,11 +356,11 @@ export default function EmployerScreen({ route, navigation }) {
       const { error } = await supabase.from('jobs').insert({
         employer_id: user?.id,
         role:       formRole.trim(),
-        company:    userName || 'My Company',
+        company:    formJobType === 'Contract / Freelance' ? (formCompany.trim() || '') : (formCompany.trim() || userName || 'My Company'),
         salary:     finalSalary,
         job_type:   formJobType,
         category:   formCategory,
-        emoji:      randomEmoji,
+        emoji:      formIcon,
         colors:     randomColors,
         match:      randomMatch,
         description: desc,
@@ -369,11 +373,13 @@ export default function EmployerScreen({ route, navigation }) {
 
       // Reset form fields
       setFormRole('');
+      setFormIcon('briefcase');
       setFormSalary('');
       setFormJobType('Full-time');
       setFormCategory('Tech & Software');
       setFormRemote(false);
       setFormDescription('');
+      setFormCompany('');
       closeSheet();
       fetchJobs(true);
     } catch (err) {
@@ -381,7 +387,7 @@ export default function EmployerScreen({ route, navigation }) {
     } finally {
       setSubmitting(false);
     }
-  }, [formRole, formSalary, formJobType, formCategory, formRemote, closeSheet, fetchJobs, userName]);
+  }, [formRole, formSalary, formJobType, formCategory, formRemote, formCompany, closeSheet, fetchJobs, userName]);
 
   // ── Render helpers ─────────────────────────────────────────────────────────
   const renderItem = useCallback(({ item }) => (
@@ -484,6 +490,33 @@ export default function EmployerScreen({ route, navigation }) {
                   <Text style={styles.sheetClose}>✕</Text>
                 </TouchableOpacity>
               </View>
+              {/* Icon Picker */}
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>ROLE ICON</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
+                  <View style={[styles.pillRow, { flexWrap: 'nowrap' }]}>
+                    {ICON_OPTIONS.map((opt) => {
+                      const iconData = ICON_MAP[opt];
+                      const IconComp = iconData.fam;
+                      const isActive = formIcon === opt;
+                      return (
+                        <TouchableOpacity
+                          key={opt}
+                          style={[
+                            styles.pill,
+                            isActive && styles.pillActive,
+                            { paddingHorizontal: 14, paddingVertical: 14, borderRadius: 14 }
+                          ]}
+                          onPress={() => setFormIcon(opt)}
+                          activeOpacity={0.8}
+                        >
+                          <IconComp name={iconData.name} size={20} color={isActive ? C.white : C.secondary} />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
 
               {/* Role title input */}
               <View style={styles.field}>
@@ -498,6 +531,21 @@ export default function EmployerScreen({ route, navigation }) {
                 />
               </View>
 
+              {/* Company name (optional for Contract / Freelance) */}
+              {formJobType === 'Contract / Freelance' && (
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>COMPANY NAME (OPTIONAL)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Leave blank if independent"
+                    placeholderTextColor={C.hint}
+                    value={formCompany}
+                    onChangeText={setFormCompany}
+                    autoCorrect={false}
+                  />
+                </View>
+              )}
+
               {/* Salary input */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>SALARY (OPTIONAL)</Text>
@@ -505,7 +553,7 @@ export default function EmployerScreen({ route, navigation }) {
                   <Text style={styles.salaryPrefix}>₦</Text>
                   <TextInput
                     style={[styles.input, styles.salaryInput]}
-                    placeholder={formJobType === 'Contract' ? "700,000" : "400,000"}
+                    placeholder={formJobType === 'Contract / Freelance' ? "700,000" : "400,000"}
                     placeholderTextColor={C.hint}
                     value={formSalary}
                     onChangeText={(text) => {
@@ -550,7 +598,7 @@ export default function EmployerScreen({ route, navigation }) {
                       style={[styles.pill, formJobType === t && styles.pillActive]}
                       onPress={() => {
                         setFormJobType(t);
-                        if (t === 'Contract') {
+                        if (t === 'Contract / Freelance') {
                           setFormSalary('700,000');
                         }
                       }}

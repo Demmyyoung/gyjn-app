@@ -16,13 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { useTheme } from '../lib/ThemeProvider';
 import { springs, timings } from '../lib/animations';
 import { haptic } from '../lib/haptics';
 import { playSound } from '../lib/sounds';
+import { ICON_MAP } from '../lib/icons';
 import StaggeredList from '../components/StaggeredList';
 import AnimatedTag from '../components/AnimatedTag';
 import GlowButton from '../components/GlowButton';
@@ -166,7 +167,12 @@ function JobCard({ job, onPress, isTop }) {
         >
           <View style={styles.cardLogoWrap}>
             <View style={[styles.cardLogoBox, { borderRadius: radii.xl }]}>
-              <Feather name="briefcase" size={24} color={colors.text.primary} />
+              {(() => {
+                const emojiVal = job.emoji || 'briefcase';
+                const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+                const IconComp = iconData.fam;
+                return <IconComp name={iconData.name} size={28} color={colors.text.primary} />;
+              })()}
             </View>
           </View>
         </LinearGradient>
@@ -1155,7 +1161,13 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
           <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
             <View style={[styles.detailLogoBox, { backgroundColor: detailJob?.colors?.[1] || C.peach }]}>
-              <Text style={{ fontSize: 32 }}>{detailJob?.emoji || '💼'}</Text>
+              {(() => {
+                const emojiVal = detailJob?.emoji || 'briefcase';
+                const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+                const IconComp = iconData.fam;
+                const darkColor = detailJob?.colors?.[0] || C.orange;
+                return <IconComp name={iconData.name} size={32} color={darkColor} />;
+              })()}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{detailJob?.role}</Text>

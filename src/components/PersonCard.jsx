@@ -1,16 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
-export default function PersonCard({ person }) {
+const PersonCard = React.memo(function PersonCard({ person }) {
   return (
     <View style={styles.card}>
       <View style={styles.imageContainer}>
         <Image 
           source={{ uri: person.image || 'https://via.placeholder.com/400x500?text=Profile+Image' }} 
-          style={styles.image} 
+          style={styles.image}
+          contentFit="cover"
+          transition={200}
         />
         <LinearGradient 
           colors={['transparent', 'rgba(0,0,0,0.7)']} 
@@ -37,7 +40,9 @@ export default function PersonCard({ person }) {
       </View>
     </View>
   );
-}
+});
+
+export default PersonCard;
 
 const styles = StyleSheet.create({
   card: {
