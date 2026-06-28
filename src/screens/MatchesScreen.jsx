@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
-  runOnJS, interpolate, withRepeat, withSequence,
+  runOnJS, interpolate, withRepeat, withSequence, FadeIn,
 } from 'react-native-reanimated';
 const AnimatedCircle = RNAnimated.createAnimatedComponent(Circle);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,23 @@ const STATUS_COLORS = {
   Interviewing: { bg: 'rgba(123,79,233,0.12)', text: '#7B4FE9' },
   Hired:        { bg: 'rgba(0,200,150,0.12)',  text: '#00C896' },
 };
+
+function StreamText({ text, style }) {
+  const [displayedText, setDisplayedText] = useState('');
+  useEffect(() => {
+    setDisplayedText('');
+    const words = text.split(' ');
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayedText(words.slice(0, i + 1).join(' '));
+      i++;
+      if (i >= words.length) clearInterval(interval);
+    }, 25); // Fast word-by-word streaming (Gemini-like)
+    return () => clearInterval(interval);
+  }, [text]);
+  
+  return <Animated.Text entering={FadeIn.duration(400)} style={style}>{displayedText}</Animated.Text>;
+}
 
 const MatchCard = React.memo(function MatchCard({ item, isNew, onPress, onChatPress, userType }) {
   const { colors: tc } = useTheme();
@@ -62,6 +79,45 @@ const MatchCard = React.memo(function MatchCard({ item, isNew, onPress, onChatPr
             const IconComp = iconData.fam;
             return <IconComp name={iconData.name} size={24} color={C.night} />;
           })()
+        )}
+        {/* Match Percentage Badge (Battery Style) */}
+        {item.match_percent != null && (
+          <View style={{
+            position: 'absolute',
+            bottom: -6,
+            right: -8,
+            width: 36,
+            height: 14,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            borderRadius: 7,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: tc.bg.card,
+            zIndex: 10,
+          }}>
+            {/* Fill Level */}
+            <View style={{
+              position: 'absolute',
+              left: 0, top: 0, bottom: 0,
+              width: `${Math.round(item.match_percent)}%`,
+              backgroundColor: item.match_percent >= 80 ? '#00C896' : item.match_percent >= 50 ? '#FF9A62' : '#FF4B4B',
+            }} />
+            {/* Percentage Text */}
+            <Text style={{ 
+              position: 'absolute',
+              width: '100%',
+              textAlign: 'center',
+              lineHeight: 11,
+              fontSize: 8, 
+              fontWeight: '900', 
+              color: '#FFF',
+              textShadowColor: 'rgba(0,0,0,0.6)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 2,
+            }}>
+              {Math.round(item.match_percent)}%
+            </Text>
+          </View>
         )}
       </View>
 
@@ -780,7 +836,7 @@ export default function MatchesScreen({ route, navigation }) {
         style={{ zIndex: 9999, elevation: 100 }}
       >
         {selectedJob && (
-          <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: 110 }}>
+          <BottomSheetScrollView style={styles.sheetContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 20, paddingBottom: insets.bottom + 160 }}>
               {isEmployer ? (
                 // ── Employer View: Candidate Profile ──────────────────────
                 <>
@@ -845,11 +901,11 @@ export default function MatchesScreen({ route, navigation }) {
                       <View style={{ gap: 12 }}>
                         <View>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.secondary, marginBottom: 4 }}>Profile & CV Summary</Text>
-                          <Text style={{ fontSize: 14, color: colors.text.primary, lineHeight: 20 }}>{selectedJob.ai_summary}</Text>
+                          <StreamText style={{ fontSize: 14, color: colors.text.primary, lineHeight: 20 }} text={selectedJob.ai_summary} />
                         </View>
                         <View style={{ backgroundColor: colors.bg.secondary, borderRadius: 10, padding: 12, borderLeftWidth: 3, borderLeftColor: colors.brand.orange }}>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.primary, marginBottom: 2 }}>Recruiter's Take</Text>
-                          <Text style={{ fontSize: 13, color: colors.text.secondary, lineHeight: 18, fontWeight: '500' }}>{selectedJob.ai_opinion}</Text>
+                          <StreamText style={{ fontSize: 13, color: colors.text.secondary, lineHeight: 18, fontWeight: '500' }} text={selectedJob.ai_opinion} />
                         </View>
                       </View>
                     ) : (

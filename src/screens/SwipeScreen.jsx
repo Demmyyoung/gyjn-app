@@ -1148,9 +1148,10 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         backgroundStyle={[styles.sheetBg2, { backgroundColor: colors.bg.elevated }]}
       >
         <BottomSheetScrollView
+          keyboardShouldPersistTaps="handled"
           style={styles.sheetContent}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 20, paddingBottom: 110 }}
+          contentContainerStyle={{ gap: 20, paddingBottom: insets.bottom + 160 }}
         >
           <View style={styles.sheetHeaderRow}>
             <Text style={[styles.sheetRoleHeader, { color: colors.text.primary }]}>Role Details</Text>

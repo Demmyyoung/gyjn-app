@@ -223,6 +223,19 @@ export default function EmployerScreen({ route, navigation }) {
     'Other'
   ];
 
+  const CATEGORY_TO_ICON = {
+    'Tech & Software': 'monitor',
+    'Design & Creative': 'palette',
+    'Product & Project': 'rocket',
+    'Data & Analytics': 'trending-up',
+    'Marketing & Sales': 'target',
+    'Business & Operations': 'briefcase',
+    'Finance & Accounting': 'pie-chart',
+    'Human Resources': 'handshake',
+    'Supply Chain & Logistics': 'truck',
+    'Other': 'sparkles',
+  };
+
   // ── Bottom sheet ───────────────────────────────────────────────────────────
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => ['70%'], []);
@@ -325,7 +338,12 @@ export default function EmployerScreen({ route, navigation }) {
         const cleaned = formSalary.replace(/[₦,]/g, '').trim();
         const isNumeric = /^\d+$/.test(cleaned);
         if (isNumeric) {
-          const formattedAmount = Number(cleaned).toLocaleString();
+          let formattedAmount = '';
+          if (cleaned.length > 3) {
+            formattedAmount = Number(cleaned).toLocaleString();
+          } else {
+            formattedAmount = cleaned;
+          }
           if (formJobType === 'Contract / Freelance' || formJobType === 'Internship') {
             finalSalary = `₦${formattedAmount}`;
           } else {
@@ -481,7 +499,7 @@ export default function EmployerScreen({ route, navigation }) {
         <BottomSheetScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.sheetContent, { gap: 20, paddingBottom: 40 }]}
+          contentContainerStyle={[styles.sheetContent, { gap: 20, paddingBottom: insets.bottom + 140 }]}
         >
           {/* Form title */}
               <View style={styles.sheetHeader}>
@@ -577,7 +595,11 @@ export default function EmployerScreen({ route, navigation }) {
                     <TouchableOpacity
                       key={c}
                       style={[styles.pill, formCategory === c && styles.pillActive]}
-                      onPress={() => setFormCategory(c)}
+                      onPress={() => {
+                        setFormCategory(c);
+                        const mappedIcon = CATEGORY_TO_ICON[c];
+                        if (mappedIcon) setFormIcon(mappedIcon);
+                      }}
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.pillText, formCategory === c && styles.pillTextActive]}>
