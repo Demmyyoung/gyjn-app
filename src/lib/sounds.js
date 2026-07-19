@@ -16,8 +16,6 @@
  *   playSound('send');
  */
 
-import { Audio } from 'expo-av';
-
 // Sound file references — these will be loaded when the actual
 // sound assets are added to assets/sounds/.
 // For now, we define the structure and gracefully handle missing files.
@@ -38,30 +36,8 @@ const soundCache = {};
  * Gracefully handles missing files — sounds are optional.
  */
 export async function preloadSounds() {
-  try {
-    // Configure audio mode to play alongside other audio and respect silent mode
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false, // Respect silent switch
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-    });
-
-    for (const [name, source] of Object.entries(SOUND_FILES)) {
-      if (source) {
-        try {
-          const { sound } = await Audio.Sound.createAsync(source, {
-            shouldPlay: false,
-            volume: 0.5,
-          });
-          soundCache[name] = sound;
-        } catch (err) {
-          console.warn(`[Sounds] Failed to preload "${name}":`, err.message);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[Sounds] Audio setup failed:', err.message);
-  }
+  // TODO: Migrate to expo-audio when sound files are added
+  console.log('[Sounds] Audio preload skipped (expo-av removed to fix JSI crash)');
 }
 
 /**
@@ -71,16 +47,8 @@ export async function preloadSounds() {
  * @param {'apply' | 'match' | 'send' | 'notification' | 'error'} name
  */
 export async function playSound(name) {
-  const sound = soundCache[name];
-  if (!sound) return; // Sound not loaded or file missing — fail silently
-
-  try {
-    await sound.setPositionAsync(0); // Rewind to start
-    await sound.playAsync();
-  } catch (err) {
-    // Don't let sound errors crash the app
-    console.warn(`[Sounds] Failed to play "${name}":`, err.message);
-  }
+  // TODO: Migrate to expo-audio when sound files are added
+  return;
 }
 
 /**
@@ -88,11 +56,5 @@ export async function playSound(name) {
  * Call on app teardown if needed.
  */
 export async function unloadSounds() {
-  for (const sound of Object.values(soundCache)) {
-    try {
-      await sound.unloadAsync();
-    } catch (_) {
-      // Ignore unload errors
-    }
-  }
+  return;
 }
