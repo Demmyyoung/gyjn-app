@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -25,7 +24,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.kodxdev.jinni"
     },
@@ -33,7 +31,7 @@
       "favicon": "./assets/favicon.png"
     },
     "runtimeVersion": {
-      "policy": "sdkVersion"
+      "policy": "fingerprint"
     },
     "extra": {
       "eas": {
@@ -47,8 +45,12 @@
     },
     "plugins": [
       "expo-web-browser",
-      "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "expo-localization",
+      "expo-image",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

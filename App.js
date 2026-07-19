@@ -1,6 +1,5 @@
 import "react-native-gesture-handler";
 import React, { useEffect, useCallback } from "react";
-import { PostHogProvider } from "posthog-react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { NavigationContainer, useRoute } from "@react-navigation/native";
@@ -245,8 +244,15 @@ function MainTabs() {
 // ── Root Stack ────────────────────────────────────────────────────────────────
 const Stack = createNativeStackNavigator();
 
-// Keep splash visible while fonts load
-SplashScreenModule.preventAutoHideAsync().catch(() => {});
+// Keep splash visible while fonts load — try/catch prevents native crash
+// on some Android devices where the module isn't ready at module scope
+try {
+  SplashScreenModule.preventAutoHideAsync();
+} catch (e) {
+  // Silently ignore — splash will auto-hide
+}
+
+
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -266,6 +272,8 @@ export default function App() {
     }
   }, [fontsLoaded]);
 
+
+
   if (!fontsLoaded) {
     return null; // Keep native splash visible
   }
@@ -277,12 +285,7 @@ export default function App() {
           <SafeAreaProvider>
             {Constants.appOwnership !== 'expo' && <GlobalNotificationHandler />}
             <NavigationContainer>
-              <PostHogProvider
-                apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY}
-                options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
-                autocapture={{ captureScreens: false }}
-              >
-                <Stack.Navigator
+              <Stack.Navigator
                   initialRouteName="Splash"
                   screenOptions={{ headerShown: false, animation: "fade" }}
                 >
@@ -305,8 +308,7 @@ export default function App() {
                     component={SettingsScreen}
                     options={{ animation: "slide_from_right" }}
                   />
-                </Stack.Navigator>
-              </PostHogProvider>
+              </Stack.Navigator>
             </NavigationContainer>
           </SafeAreaProvider>
         </GestureHandlerRootView>

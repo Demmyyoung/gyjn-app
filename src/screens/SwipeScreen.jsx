@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Modal, Pressable, Dimensions, Platform, NativeModules,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { getBackendUrl } from '../lib/config';
@@ -1019,11 +1019,14 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
-      {/* Header — logo center, placeholders on sides */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
-        <View style={{ width: 40 }} />
-        <Text style={[styles.logo, { color: colors.text.primary }]}>🧞‍♂️ Jinni</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — logo & text on left side */}
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8), justifyContent: 'flex-start', alignItems: 'center', gap: 8 }]}>
+        <Image 
+          source={require('../../assets/logo.png')} 
+          style={{ width: 28, height: 28 }} 
+          resizeMode="contain" 
+        />
+        <Text style={[styles.logo, { color: colors.text.primary }]}>Jinni</Text>
       </View>
 
       {/* Morphing Liquid-Glass Notification Button */}

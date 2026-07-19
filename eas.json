@@ -7,15 +7,30 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bwmeojuvxlufknwvlrbz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3bWVvanV2eGx1Zmtud3ZscmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mzc2MjgsImV4cCI6MjA5MDExMzYyOH0.E8h-ZNDVGGipPYOjwXJCf0SnPpwm3NxtR0N90EFePFA",
+        "EXPO_PUBLIC_BACKEND_URL": "https://gyjn-dashboard-fj8u.vercel.app"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "channel": "main"
+      "channel": "main",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bwmeojuvxlufknwvlrbz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3bWVvanV2eGx1Zmtud3ZscmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mzc2MjgsImV4cCI6MjA5MDExMzYyOH0.E8h-ZNDVGGipPYOjwXJCf0SnPpwm3NxtR0N90EFePFA",
+        "EXPO_PUBLIC_BACKEND_URL": "https://gyjn-dashboard-fj8u.vercel.app"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bwmeojuvxlufknwvlrbz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3bWVvanV2eGx1Zmtud3ZscmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1Mzc2MjgsImV4cCI6MjA5MDExMzYyOH0.E8h-ZNDVGGipPYOjwXJCf0SnPpwm3NxtR0N90EFePFA",
+        "EXPO_PUBLIC_BACKEND_URL": "https://gyjn-dashboard-fj8u.vercel.app"
+      }
     }
   },
   "submit": {

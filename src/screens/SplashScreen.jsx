@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { 
   useSharedValue, 
@@ -182,7 +182,7 @@ export default function SplashScreen({ navigation }) {
             iconStyle
           ]}
         >
-          <Text style={styles.icon}>💼</Text>
+          <Image source={require('../../assets/logo.png')} style={{ width: 70, height: 70 }} resizeMode="contain" />
         </Animated.View>
         
         {/* Letter by letter Wordmark */}
