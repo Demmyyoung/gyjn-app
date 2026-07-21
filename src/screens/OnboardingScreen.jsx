@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { makeRedirectUri } from 'expo-auth-session';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import * as Sentry from '@sentry/react-native';
