@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from './supabase';
 
 if (Constants.appOwnership !== 'expo') {
@@ -140,6 +141,7 @@ async function registerForPushNotificationsAsync() {
       }
       if (finalStatus !== 'granted') {
         console.log('Failed to get push token for push notification!');
+        Sentry.captureMessage(`Push Notifications Permission Not Granted: ${finalStatus}`, 'warning');
         return;
       }
       // Learn more about projectId:
@@ -161,6 +163,7 @@ async function registerForPushNotificationsAsync() {
     }
   } catch (e) {
     console.warn('Error during registerForPushNotificationsAsync:', e);
+    Sentry.captureException(e);
   }
 
   return token;

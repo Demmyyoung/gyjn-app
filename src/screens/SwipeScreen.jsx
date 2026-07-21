@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { useTheme } from '../lib/ThemeProvider';
@@ -648,6 +649,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         }
       } catch (err) {
         console.warn('Failed to load profile for queryFn:', err);
+        Sentry.captureException(err);
       }
 
       try {
@@ -675,11 +677,19 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         return localScoredJobs;
       } catch (err) {
         console.warn('API fetch failed, falling back to direct Supabase query:', err.message);
-        const { data, error } = await supabase
+        Sentry.captureException(err);
+        
+        let query = supabase
           .from('jobs')
           .select('*')
-          .eq('status', 'Open')
-          .order('created_at', { ascending: false });
+          .eq('status', 'Open');
+          
+        const targetCategory = activeProfile.category || route.params?.category;
+        if (targetCategory) {
+          query = query.eq('category', targetCategory);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
         if (error) throw new Error(error.message);
         
         // Calculate scores locally
@@ -1078,6 +1088,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           }
 
           const { data, error } = await supabase.from('matches').insert({
+            user_id:             user?.id || null,
             job_id:              topJob.id,
             candidate_name:      activeProfile.user_name || route.params?.userName || 'Professional',
             candidate_role:      activeProfile.user_role || route.params?.userRole || '',
@@ -1094,6 +1105,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
 
           if (error) {
             console.warn('[saveMatch]', error.message);
+            Sentry.captureException(error);
             Alert.alert('Apply Failed', 'Could not apply to this role. Please check your connection or try again later. Error: ' + error.message);
             return;
           }
@@ -1110,6 +1122,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
                 if (!analyzeRes.ok) {
                   const errBody = await analyzeRes.text();
                   console.warn(`[analyzeMatch] Attempt ${attempt + 1} failed (${analyzeRes.status}):`, errBody);
+                  Sentry.captureException(new Error(`[analyzeMatch] HTTP ${analyzeRes.status}: ${errBody}`));
                   if (attempt < retries) {
                     await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
                     continue;
@@ -1120,6 +1133,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
                 }
               } catch (err) {
                 console.warn(`[analyzeMatch] Attempt ${attempt + 1} network error:`, err);
+                Sentry.captureException(err);
                 if (attempt < retries) {
                   await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
                 }
@@ -1129,6 +1143,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
           triggerAnalysis();
         } catch (err) {
           console.warn('Failed to save match to database:', err);
+          Sentry.captureException(err);
         }
       };
 

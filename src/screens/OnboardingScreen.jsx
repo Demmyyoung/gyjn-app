@@ -308,12 +308,31 @@ export default function OnboardingScreen({ navigation }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     isNavigating.current = true;
     
-    // In a real app, save to Supabase here:
-    // await supabase.from('seeker_profiles').upsert({ id: user.id, ...profileData });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await supabase.from('seeker_profiles').upsert({ 
+          id: session.user.id, 
+          user_name: profileData.user_name,
+          user_role: profileData.job_type,
+          about_me: profileData.about_me,
+          skills: profileData.skills,
+          experience_level: profileData.experience_level
+        });
+      }
+    } catch (e) {
+      console.warn("Could not save to supabase:", e);
+    }
 
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Main', params: { userType: 'seeker', ...profileData } }],
+      routes: [{ name: 'Main', params: { 
+        userType: 'seeker', 
+        userName: profileData.user_name,
+        userRole: profileData.job_type,
+        aboutMe: profileData.about_me,
+        skills: profileData.skills
+      } }],
     });
   };
 

@@ -4,9 +4,11 @@ import {
   SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Pressable
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { getBackendUrl } from '../lib/config';
@@ -285,6 +287,8 @@ export default function LoginScreen({ navigation, route }) {
         Alert.alert('Error saving profile', error.message);
         return;
       }
+
+      Sentry.setUser({ id: user.id, email: user.email, role: isEmployer ? 'employer' : 'seeker' });
 
       navigation.reset({
         index: 0,

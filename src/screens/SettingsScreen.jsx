@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { getBackendUrl } from '../lib/config';
@@ -319,7 +320,7 @@ export default function SettingsScreen({ navigation, route }) {
             const { data: existingMatches } = await supabase
             .from('matches')
             .select('match_id')
-            .eq('candidate_name', route.params?.userName || forcedDraft.name);
+            .eq('user_id', user.id);
 
             if (existingMatches && existingMatches.length > 0) {
             const matchUpdates = {
@@ -339,7 +340,10 @@ export default function SettingsScreen({ navigation, route }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ match_id: m.match_id }),
-                }).catch(err => console.warn('[recalculate-match]', err));
+                }).catch(err => {
+                  console.warn('[recalculate-match]', err);
+                  Sentry.captureException(err);
+                });
             }
             }
         }
@@ -360,6 +364,7 @@ export default function SettingsScreen({ navigation, route }) {
       
     } catch (err) {
       console.warn('Database save failed:', err);
+      Sentry.captureException(err);
     } finally {
       setSaving(false);
     }
@@ -469,6 +474,7 @@ export default function SettingsScreen({ navigation, route }) {
         }
       } catch (parseErr) {
         console.warn('CV Auto-fill failed:', parseErr);
+        Sentry.captureException(parseErr);
         if (parseErr.message === 'RATE_LIMIT_EXCEEDED') {
           Alert.alert(
             'Rate Limit Exceeded',

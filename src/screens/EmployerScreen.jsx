@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import { getBackendUrl } from '../lib/config';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 import { ICON_MAP, ICON_OPTIONS } from '../lib/icons';
 
 const JOB_TYPES = ['Full-time', 'Part-time', 'Contract / Freelance', 'Internship'];
@@ -204,8 +205,9 @@ export default function EmployerScreen({ route, navigation }) {
       }, 20);
 
     } catch (err) {
-      console.warn('AI Enhancement failed', err);
-      Alert.alert('Error', 'Failed to reach AI. Please try again later.');
+      Sentry.captureException(err);
+      Alert.alert('AI Error', 'Could not enhance description at this time.');
+    } finally {
       setIsEnhancing(false);
     }
   };
@@ -290,7 +292,7 @@ export default function EmployerScreen({ route, navigation }) {
 
       setJobs(enriched);
     } catch (err) {
-      console.warn('[EmployerScreen] fetchJobs error:', err?.message);
+      Sentry.captureException(err);
     } finally {
       setLoading(false);
       setRefreshing(false);

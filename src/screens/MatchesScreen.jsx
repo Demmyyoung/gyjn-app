@@ -494,12 +494,8 @@ export default function MatchesScreen({ route, navigation }) {
           messages(text, sender_type, created_at)
         `);
 
-      if (dbProfile) {
-        if (!isEmployer) {
-          query = query.eq('candidate_name', dbProfile.user_name || userName || 'Professional');
-        }
-      } else {
-        query = query.eq('candidate_name', userName || 'Professional');
+      if (!isEmployer) {
+        query = query.eq('user_id', user.id);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });

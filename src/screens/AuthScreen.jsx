@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { C } from '../lib/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -145,6 +146,7 @@ export default function AuthScreen({ navigation, route }) {
       const empData = await fetchProfileDirect('employer_profiles', user.id, accessToken);
 
       if (empData && empData.user_name) {
+        Sentry.setUser({ id: user.id, email: user.email, role: 'employer' });
         navigation.reset({
           index: 0,
           routes: [{
@@ -169,6 +171,7 @@ export default function AuthScreen({ navigation, route }) {
       const seekerData = await fetchProfileDirect('seeker_profiles', user.id, accessToken);
 
       if (seekerData && seekerData.user_name) {
+        Sentry.setUser({ id: user.id, email: user.email, role: 'seeker' });
         navigation.reset({
           index: 0,
           routes: [{

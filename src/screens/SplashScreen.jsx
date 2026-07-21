@@ -9,6 +9,8 @@ import Animated, {
   withDelay,
   Easing
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Sentry from '@sentry/react-native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeProvider';
 import { springs, timings } from '../lib/animations';
@@ -75,9 +77,9 @@ export default function SplashScreen({ navigation }) {
 
     // Hard failsafe: if anything takes longer than 6 seconds total, go to Onboarding
     const hardTimeout = setTimeout(() => {
-      console.warn('[Splash] Hard timeout hit — navigating to Onboarding');
+      Sentry.captureMessage('[Splash] Hard timeout hit — navigating to Onboarding', 'warning');
       navigation.replace('Onboarding');
-    }, 6000);
+    }, 15000);
 
     // Fetch data immediately alongside the animation
     const fetchSessionAndNavigate = async () => {
@@ -119,6 +121,8 @@ export default function SplashScreen({ navigation }) {
               lastTab = await AsyncStorage.getItem('LAST_ACTIVE_TAB');
             } catch (e) {}
 
+            Sentry.setUser({ id: session.user.id, email: session.user.email, role: userType });
+
             navigation.replace('Main', {
               screen: lastTab || 'Discover',
               params: {
@@ -142,6 +146,7 @@ export default function SplashScreen({ navigation }) {
         }
       } catch (err) {
         console.warn('[Splash] Session fetch error or timeout:', err.message);
+        Sentry.captureException(err);
         clearTimeout(hardTimeout);
         navigation.replace('Onboarding');
       }

@@ -94,7 +94,7 @@ export default function ProfileScreen({ navigation, route }) {
           const { count } = await supabase
             .from('matches')
             .select('*', { count: 'exact', head: true })
-            .eq('candidate_name', activeName);
+            .eq('user_id', user.id);
           setLocalMatches(count || 0);
         }
       }
