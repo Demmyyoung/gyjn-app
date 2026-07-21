@@ -715,7 +715,7 @@ export default function ChatScreen({ route, navigation }) {
     : {};
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
       <Wrapper
         style={[styles.container, { backgroundColor: colors.bg.primary }]}
         {...wrapperProps}
@@ -842,7 +842,7 @@ export default function ChatScreen({ route, navigation }) {
           intensity={isDark ? 30 : 85} tint={isDark ? "dark" : "light"}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          style={[styles.inputBar, { paddingBottom: 12, backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)') : colors.bg.card }]}
+          style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: Platform.OS === 'ios' ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)') : colors.bg.card }]}
         >
           {isEmployer && (
             <BounceButton
@@ -931,7 +931,7 @@ export default function ChatScreen({ route, navigation }) {
         />
       )}
       </Wrapper>
-    </SafeAreaView>
+    </View>
   );
 }
 

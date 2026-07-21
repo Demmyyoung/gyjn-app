@@ -3,13 +3,15 @@ import { View } from 'react-native';
 import Animated, { useSharedValue } from 'react-native-reanimated';
 import { animateStaggerEntrance } from '../lib/animations';
 
-function StaggerItem({ children, index, baseDelay }) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
+function StaggerItem({ children, index, baseDelay, animate }) {
+  const opacity = useSharedValue(animate ? 0 : 1);
+  const translateY = useSharedValue(animate ? 20 : 0);
 
   useEffect(() => {
-    animateStaggerEntrance(opacity, translateY, index, { baseDelay });
-  }, [index, baseDelay]);
+    if (animate) {
+      animateStaggerEntrance(opacity, translateY, index, { baseDelay });
+    }
+  }, [index, baseDelay, animate]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
@@ -22,7 +24,8 @@ export default function StaggeredList({
   children, 
   baseDelay = 60,
   style,
-  contentContainerStyle 
+  contentContainerStyle,
+  animate = true
 }) {
   // Filter out null/undefined children
   const validChildren = React.Children.toArray(children).filter(Boolean);
@@ -31,7 +34,7 @@ export default function StaggeredList({
     <View style={style}>
       <View style={contentContainerStyle}>
         {validChildren.map((child, index) => (
-          <StaggerItem key={child.key || index} index={index} baseDelay={baseDelay}>
+          <StaggerItem key={child.key || index} index={index} baseDelay={baseDelay} animate={animate}>
             {child}
           </StaggerItem>
         ))}

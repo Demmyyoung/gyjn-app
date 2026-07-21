@@ -56,6 +56,33 @@ const queryClient = new QueryClient({
 const Tab = createBottomTabNavigator();
 
 import { Feather } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://cc6b10eabfcdfec41610a61f98a39bf4@o4511766667722752.ingest.de.sentry.io/4511773891625040',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 1.0,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [
+    Sentry.mobileReplayIntegration({
+      maskAllText: true,
+      maskAllImages: true,
+      maskAllVectors: true,
+    }),
+    Sentry.feedbackIntegration()
+  ],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 // Custom tab bar icon component with micro-bounce on selection
 function TabIcon({ name, focused }) {
@@ -254,7 +281,7 @@ try {
 
 
 
-export default function App() {
+export default Sentry.wrap(function App() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -315,4 +342,4 @@ export default function App() {
       </QueryClientProvider>
     </ThemeProvider>
   );
-}
+});

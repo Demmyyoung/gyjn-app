@@ -1,12 +1,11 @@
-// metro.config.js
-// Explicitly sets the project root to THIS folder so Metro doesn't
-// get confused by the package-lock.json sitting in the parent GYJN folder.
-const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const {
+  getSentryExpoConfig
+} = require("@sentry/react-native/metro");
 
 const projectRoot = __dirname; // C:\Users\demil\OneDrive\Documents\GYJN\gyjn-app
 
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 // Force Metro to only look inside gyjn-app, not the parent GYJN folder
 config.watchFolders = [projectRoot];

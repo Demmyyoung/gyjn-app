@@ -181,8 +181,8 @@ function JobCard({ job, onPress, isTop }) {
           <Text style={[typography.caption, { color: colors.brand.orange }]}>{job.company}</Text>
           <Text style={[typography.title, { color: colors.text.primary }]}>{job.role}</Text>
 
-          <StaggeredList baseDelay={80} style={styles.cardTagsRow} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {job.tags && job.tags.slice(0, 2).map((t, idx) => (
+          <StaggeredList animate={job.isInitialTop} baseDelay={80} style={styles.cardTagsRow} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {job.tags && job.tags.slice(0, 3).map((t, idx) => (
               <AnimatedTag 
                 key={idx} 
                 label={t.label} 
@@ -192,7 +192,6 @@ function JobCard({ job, onPress, isTop }) {
           </StaggeredList>
 
           <View style={[styles.cardBottomFooter, { borderTopColor: colors.border.light }]}>
-            <Text style={[typography.label, { color: colors.text.primary }]}>{formatDisplaySalary(job.salary)}</Text>
             <Text style={[typography.micro, { color: colors.text.hint }]}>Tap details ➔</Text>
           </View>
         </View>
@@ -349,11 +348,259 @@ function LoadingPulse() {
 
   return (
     <View style={styles.pulseContainer}>
-      <Animated.View style={[styles.pulseCircle, { borderRadius: radii.full, backgroundColor: colors.bg.card }, shadows.md, animatedStyle]}>
+      <Animated.View style={[styles.pulseCircle, { borderRadius: 50, backgroundColor: colors.bg.card }, shadows.md, animatedStyle]}>
         <Feather name="search" size={24} color={colors.brand.orange} />
       </Animated.View>
       <ActivityIndicator size="small" color={colors.brand.orange} style={{ marginTop: 24 }} />
     </View>
+  );
+}
+
+// ─── ExpandedDetailCard ───────────────────────────────────────────────────────
+
+function ExpandedDetailCard({ job, isVisible, onClose, onApply }) {
+  const { colors, typography, radii, shadows } = useTheme();
+  const insets = useSafeAreaInsets();
+  
+  const expandAnim = useSharedValue(0);
+  const dragY = useSharedValue(0);
+
+  useEffect(() => {
+    if (isVisible) {
+      expandAnim.value = withSpring(1, { damping: 28, stiffness: 280, mass: 0.8 });
+      dragY.value = 0;
+    } else {
+      expandAnim.value = withSpring(0, { damping: 28, stiffness: 280, mass: 0.8 });
+    }
+  }, [isVisible]);
+
+  const cardTopInitial = (SCREEN_H + insets.top + 48 - CARD_HEIGHT) / 2;
+  const cardLeftInitial = (SCREEN_W - CARD_W) / 2;
+
+  const containerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: expandAnim.value > 0.01 || isVisible ? 1 : 0,
+      pointerEvents: isVisible ? 'auto' : 'none',
+      transform: [{ translateY: dragY.value }],
+    };
+  });
+
+  const cardStyle = useAnimatedStyle(() => {
+    const width = interpolate(expandAnim.value, [0, 1], [CARD_W, SCREEN_W], 'clamp');
+    const height = interpolate(expandAnim.value, [0, 1], [CARD_HEIGHT, SCREEN_H], 'clamp');
+    const borderRadius = interpolate(expandAnim.value, [0, 1], [36, 40], 'clamp'); // Keep native-style modal curve
+    const top = interpolate(expandAnim.value, [0, 1], [cardTopInitial, Math.max(insets.top, 24) + 16], 'clamp');
+    const left = interpolate(expandAnim.value, [0, 1], [cardLeftInitial, 0], 'clamp');
+
+    return {
+      position: 'absolute',
+      width,
+      height,
+      borderRadius,
+      top,
+      left,
+      overflow: 'hidden',
+      backgroundColor: colors.bg.card,
+    };
+  });
+
+  const bgColors = job?.colors && job.colors.length >= 2 ? job.colors : [colors.brand.orange, colors.brand.mango];
+
+  // Calculate mathematically exact background height based on flex wrapping of JobCard
+  const roleLines = job?.role?.length > 22 ? 2 : 1;
+  const calculatedBottomHeight = 142 + (roleLines * 26);
+  const calculatedGradientHeight = CARD_HEIGHT - calculatedBottomHeight;
+  const translateDistance = (calculatedGradientHeight + 24) - 88;
+
+  const closedBackgroundStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: CARD_HEIGHT,
+      opacity: interpolate(expandAnim.value, [0, 1], [1, 0], 'clamp'),
+      overflow: 'hidden',
+    };
+  });
+
+  const headerUIOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(expandAnim.value, [0.5, 1], [0, 1], 'clamp'),
+    };
+  });
+
+  const iconScrollStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      left: 24,
+      top: 24,
+      width: interpolate(expandAnim.value, [0, 1], [64, 48], 'clamp'),
+      height: interpolate(expandAnim.value, [0, 1], [64, 48], 'clamp'),
+      borderRadius: interpolate(expandAnim.value, [0, 1], [radii.xl || 32, radii.md || 16], 'clamp'),
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: interpolateColor(expandAnim.value, [0, 1], ['rgba(255, 255, 255, 0.35)', 'transparent']),
+      backgroundColor: interpolateColor(expandAnim.value, [0, 1], ['rgba(255, 255, 255, 0.25)', bgColors[1] || colors.brand.orange]),
+    };
+  });
+
+  const textTranslateStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: interpolate(expandAnim.value, [0, 1], [translateDistance, 0], 'clamp') }],
+    };
+  });
+
+  const extraContentStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(expandAnim.value, [0.5, 1], [0, 1], 'clamp'),
+    };
+  });
+
+  const footerOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(expandAnim.value, [0, 0.5], [1, 0], 'clamp'),
+    };
+  });
+
+  const gesture = Gesture.Pan()
+    .onUpdate((e) => {
+      if (e.translationY > 0) {
+        // As they pull down, interactively reverse the expansion animation!
+        // The top of the card will perfectly follow their finger.
+        const progress = Math.max(0, 1 - (e.translationY / cardTopInitial));
+        expandAnim.value = progress;
+        dragY.value = 0; // We don't need additional translation since expandAnim handles it
+      } else {
+        // Slight rubber-band if they pull up
+        dragY.value = e.translationY * 0.1;
+      }
+    })
+    .onEnd((e) => {
+      dragY.value = withSpring(0, { damping: 25, stiffness: 250 });
+      if (e.translationY > 100 || e.velocityY > 500) {
+        // Close it - the useEffect will fluidly continue the spring down to 0 from its current progress!
+        runOnJS(onClose)();
+      } else {
+        // Snap back to fully expanded
+        expandAnim.value = withSpring(1, { damping: 28, stiffness: 280, mass: 0.8 });
+      }
+    });
+
+  if (!job) return null;
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }, containerStyle]}>
+      <Animated.View style={cardStyle}>
+        
+        <Animated.View style={closedBackgroundStyle}>
+          <LinearGradient colors={bgColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1, borderTopLeftRadius: 36, borderTopRightRadius: 36 }} />
+          
+          {/* Invisible sizing block perfectly matching JobCard's cardBottom layout to force exact same gradient height */}
+          <View style={[styles.cardBottom, { opacity: 0 }]} pointerEvents="none">
+            <Text style={[typography.caption, { color: colors.brand.orange }]}>{job.company}</Text>
+            <Text style={[typography.title, { color: colors.text.primary }]}>{job.role}</Text>
+            <View style={[styles.cardTagsRow, { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
+              {job.tags && job.tags.slice(0, 3).map((t, idx) => (
+                <View key={idx} style={[styles.cardTag, { paddingHorizontal: 8, paddingVertical: 4 }]}>
+                  <Text style={[styles.cardTagText, { fontSize: 10 }]}>{t.label}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={[styles.cardBottomFooter, { borderTopColor: colors.border.light }]}>
+              <Text style={[typography.micro, { color: colors.text.hint }]}>Tap details ➔</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        <ScrollView 
+          style={StyleSheet.absoluteFill}
+          contentContainerStyle={{ padding: 24, paddingTop: 88, paddingBottom: Math.max(insets.bottom, 24) + 100 + Math.max(insets.top, 16) }}
+          showsVerticalScrollIndicator={false}
+        >
+             <Animated.View style={iconScrollStyle}>
+               {(() => {
+                 const emojiVal = job.emoji || 'briefcase';
+                 const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
+                 const IconComp = iconData.fam;
+                 return <IconComp name={iconData.name} size={28} color={colors.text.primary} />;
+               })()}
+             </Animated.View>
+
+             <Animated.View style={[textTranslateStyle]}>
+               <View style={{ gap: 8 }}>
+                 <Text style={[typography.caption, { color: colors.brand.orange }]}>{job.company}</Text>
+                 <Text style={[typography.title, { color: colors.text.primary }]}>{job.role}</Text>
+                 <View style={[styles.cardTagsRow, { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }]}>
+                   {job.tags && job.tags.slice(0, 3).map((t, idx) => (
+                     <AnimatedTag key={idx} label={t.label} colorType={t.type === 'green' ? 'green' : t.type === 'purple' ? 'purple' : 'orange'} animate={false} />
+                   ))}
+                 </View>
+               </View>
+
+               {/* Tap for details footer (fades out when expanding) */}
+               <Animated.View style={[styles.cardBottomFooter, { borderTopColor: colors.border.light }, footerOpacityStyle]}>
+                 <Text style={[typography.micro, { color: colors.text.hint }]}>Tap details ➔</Text>
+               </Animated.View>
+
+               {/* FADING IN EXTRA CONTENT */}
+               <Animated.View style={[extraContentStyle, { marginTop: 12 }]}>
+                 {job.category && (
+                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+                     <View style={[styles.detailPill, { backgroundColor: colors.bg.secondary, borderColor: colors.border.light }]}>
+                       <Text style={[styles.detailPillText, { color: colors.text.primary }]}>{job.category}</Text>
+                     </View>
+                   </View>
+                 )}
+
+                 {job.description && (
+                   <View style={{ gap: 8, marginBottom: 24 }}>
+                     <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>ABOUT THE ROLE</Text>
+                     <Text style={[styles.sheetDesc, { color: colors.text.secondary }]}>{job.description}</Text>
+                   </View>
+                 )}
+
+                 {job.reqs && job.reqs.length > 0 && (
+                   <View style={{ gap: 8 }}>
+                     <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>REQUIREMENTS</Text>
+                     {job.reqs.map((r, i) => (
+                       <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+                         <Text style={{ color: colors.brand.orange }}>•</Text>
+                         <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22, flex: 1 }}>{r}</Text>
+                       </View>
+                     ))}
+                   </View>
+                 )}
+                 
+                 <GlowButton
+                   title="Apply via Jinni →"
+                   onPress={onApply}
+                   style={{ marginTop: 24 }}
+                 />
+               </Animated.View>
+             </Animated.View>
+          </ScrollView>
+          
+          {/* Drag Handle at top */}
+          <Animated.View style={[headerUIOpacityStyle, { position: 'absolute', top: 0, left: 0, right: 0 }]}>
+            <GestureDetector gesture={gesture}>
+              <View style={{ height: 56, alignItems: 'center', paddingTop: 16, zIndex: 999, backgroundColor: 'transparent' }}>
+                <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border.medium }} />
+              </View>
+            </GestureDetector>
+          </Animated.View>
+
+          <Animated.View style={[headerUIOpacityStyle, { position: 'absolute', top: 16, right: 24, zIndex: 1000 }]}>
+            <TouchableOpacity
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg.secondary, alignItems: 'center', justifyContent: 'center' }}
+              onPress={onClose}
+            >
+              <Feather name="chevron-down" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </Animated.View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -415,8 +662,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         const data = await response.json();
         
         // Calculate scores locally since backend no longer sends match %
-        const localScoredJobs = (data.jobs || []).map(job => ({
+        const localScoredJobs = (data.jobs || []).map((job, idx) => ({
           ...job,
+          isInitialTop: idx === 0,
           match: calculateMatchScore({
             category: activeProfile.category || route.params?.category,
             skills: activeProfile.skills || route.params?.skills || [],
@@ -435,14 +683,20 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         if (error) throw new Error(error.message);
         
         // Calculate scores locally
-        const localScoredJobs = (data ?? []).map(job => ({
+        const localScoredJobs = (data ?? []).map((job, idx) => ({
           ...job,
+          isInitialTop: idx === 0,
           match: calculateMatchScore({
             category: activeProfile.category || route.params?.category,
             skills: activeProfile.skills || route.params?.skills || [],
             jobType: activeProfile.job_type || route.params?.jobType
           }, job)
         })).sort((a, b) => b.match - a.match);
+
+        // After sorting, re-assign isInitialTop based on final order
+        localScoredJobs.forEach((job, idx) => {
+          job.isInitialTop = idx === 0;
+        });
 
         return localScoredJobs;
       }
@@ -582,40 +836,9 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   const swipedCardId = useSharedValue(null);
   const indexOffset = useSharedValue(0);
 
-  const sheetRef = useRef(null);
-  const snapPoints = useMemo(() => ['85%'], []);
-
   const closeDetail = useCallback(() => {
-    sheetRef.current?.close();
+    setShowDetail(false);
   }, []);
-
-  // Automatically trigger slide-up transition when details modal opens
-  useEffect(() => {
-    if (showDetail) {
-      sheetRef.current?.expand();
-    } else {
-      sheetRef.current?.close();
-    }
-  }, [showDetail]);
-
-  const handleSheetChanges = useCallback((index) => {
-    if (index === -1) {
-      setShowDetail(false);
-    }
-  }, []);
-
-  const renderBackdrop = useCallback(
-    (props) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.35}
-        pressBehavior="close"
-      />
-    ),
-    []
-  );
 
   const morphingContainerStyle = useAnimatedStyle(() => {
     const currentWidth = interpolate(progress.value, [0, 1], [40, SCREEN_W - 48]);
@@ -684,7 +907,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
       elevation: currentElevation,
       position: 'absolute',
       right: 24,
-      top: Math.max(insets.top, 8),
+      top: Math.max(insets.top, 24) + 12,
       zIndex: 999,
       overflow: 'hidden',
       borderWidth: 1.5,
@@ -1020,7 +1243,7 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg.primary }]}>
       {/* Header — logo & text on left side */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 8), justifyContent: 'flex-start', alignItems: 'center', gap: 8 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 12, justifyContent: 'flex-start', alignItems: 'center', gap: 8 }]}>
         <Image 
           source={require('../../assets/logo.png')} 
           style={{ width: 28, height: 28 }} 
@@ -1138,88 +1361,13 @@ export default function SwipeScreen({ route, navigation, onMatchLand }) {
         ))}
       </View>
 
-      {/* Detail bottom sheet */}
-      <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents={showDetail ? "auto" : "none"}>
-        <BottomSheet
-          ref={sheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        onChange={handleSheetChanges}
-        handleIndicatorStyle={[styles.sheetHandle, { backgroundColor: colors.border.medium }]}
-        backgroundStyle={[styles.sheetBg2, { backgroundColor: colors.bg.elevated }]}
-      >
-        <BottomSheetScrollView
-          keyboardShouldPersistTaps="handled"
-          style={styles.sheetContent}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 20, paddingBottom: insets.bottom + 160 }}
-        >
-          <View style={styles.sheetHeaderRow}>
-            <Text style={[styles.sheetRoleHeader, { color: colors.text.primary }]}>Role Details</Text>
-            <TouchableOpacity onPress={closeDetail} activeOpacity={0.7} style={[styles.sheetCloseBtn, { backgroundColor: colors.bg.secondary }]}>
-              <Text style={[styles.sheetClose, { color: colors.text.secondary }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-            <View style={[styles.detailLogoBox, { backgroundColor: detailJob?.colors?.[1] || C.peach }]}>
-              {(() => {
-                const emojiVal = detailJob?.emoji || 'briefcase';
-                const iconData = ICON_MAP[emojiVal] || ICON_MAP['briefcase'];
-                const IconComp = iconData.fam;
-                const darkColor = detailJob?.colors?.[0] || C.orange;
-                return <IconComp name={iconData.name} size={32} color={darkColor} />;
-              })()}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text.primary }}>{detailJob?.role}</Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: C.orange, marginTop: 4 }}>{detailJob?.company}</Text>
-            </View>
-          </View>
-
-          {/* Tags */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {detailJob?.job_type && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{detailJob.job_type}</Text></View>}
-            {detailJob?.salary && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{formatDisplaySalary(detailJob.salary)}</Text></View>}
-            {detailJob?.category && <View style={[styles.detailPill, { backgroundColor: colors.bg.card, borderColor: colors.border.light }]}><Text style={[styles.detailPillText, { color: colors.text.primary }]}>{detailJob.category}</Text></View>}
-            {detailJob?.tags?.slice(0,2).map((t, i) => (
-              <View key={i} style={[styles.detailPill, { backgroundColor: TAG_COLORS[t.type]?.bg || TAG_COLORS.default.bg, borderColor: 'transparent' }]}>
-                <Text style={[styles.detailPillText, { color: TAG_COLORS[t.type]?.text || TAG_COLORS.default.text }]}>{t.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Description */}
-          {detailJob?.description && (
-            <View style={{ gap: 8 }}>
-              <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>ABOUT THE ROLE</Text>
-              <Text style={[styles.sheetDesc, { color: colors.text.secondary }]}>{detailJob.description}</Text>
-            </View>
-          )}
-
-          {/* Reqs */}
-          {detailJob?.reqs && detailJob.reqs.length > 0 && (
-            <View style={{ gap: 8 }}>
-              <Text style={[styles.sheetSectionLabel, { color: colors.text.hint }]}>REQUIREMENTS</Text>
-              {detailJob.reqs.map((r, i) => (
-                <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
-                  <Text style={{ color: C.orange }}>•</Text>
-                  <Text style={{ fontSize: 15, color: colors.text.primary, lineHeight: 22, flex: 1 }}>{r}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <GlowButton
-            title="Apply via Jinni →"
-            onPress={() => { closeDetail(); triggerSwipe('right'); }}
-            style={{ marginTop: 24 }}
-          />
-        </BottomSheetScrollView>
-      </BottomSheet>
-      </View>
+      {/* Expanded Details Card Overlay */}
+      <ExpandedDetailCard 
+        job={detailJob}
+        isVisible={showDetail}
+        onClose={closeDetail}
+        onApply={() => { closeDetail(); setTimeout(() => triggerSwipe('right'), 300); }}
+      />
     </View>
   );
 }
