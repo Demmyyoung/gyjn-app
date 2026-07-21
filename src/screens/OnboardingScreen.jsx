@@ -15,7 +15,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as FileSystem from 'expo-file-system';
 import { makeRedirectUri } from 'expo-auth-session';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import * as Sentry from '@sentry/react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,8 +25,6 @@ import { springs, timings } from '../lib/animations';
 import StaggeredList from '../components/StaggeredList';
 import BounceButton from '../components/BounceButton';
 import AnimatedInput from '../components/AnimatedInput';
-
-const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY || '');
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -233,32 +230,45 @@ export default function OnboardingScreen({ navigation }) {
         try {
           const base64Data = await FileSystem.readAsStringAsync(res.assets[0].uri, { encoding: FileSystem.EncodingType.Base64 });
           
-          const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+          const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+          const requestBody = {
+            contents: [{
+              parts: [
+                { text: "Please parse this CV and extract the requested fields. Ensure skills is an array of strings." },
+                { inline_data: { mime_type: "application/pdf", data: base64Data } }
+              ]
+            }],
             generationConfig: {
-              responseMimeType: 'application/json',
+              responseMimeType: "application/json",
               responseSchema: {
-                type: SchemaType.OBJECT,
+                type: "OBJECT",
                 properties: {
-                  user_name: { type: SchemaType.STRING, description: 'The candidate full name.' },
-                  job_type: { type: SchemaType.STRING, description: 'A suitable professional role.' },
-                  about_me: { type: SchemaType.STRING, description: 'A short 2 sentence bio.' },
-                  experience_level: { type: SchemaType.STRING, description: 'Experience level (e.g. Junior, Mid-Level (3-5 yrs)).' },
-                  skills: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Top 3-5 technical or professional skills.' }
+                  user_name: { type: "STRING", description: "The candidate full name." },
+                  job_type: { type: "STRING", description: "A suitable professional role." },
+                  about_me: { type: "STRING", description: "A short 2 sentence bio." },
+                  experience_level: { type: "STRING", description: "Experience level (e.g. Junior, Mid-Level (3-5 yrs))." },
+                  skills: { type: "ARRAY", items: { type: "STRING" }, description: "Top 3-5 technical or professional skills." }
                 },
-                required: ['user_name', 'job_type', 'about_me', 'experience_level', 'skills']
+                required: ["user_name", "job_type", "about_me", "experience_level", "skills"]
               }
             }
+          };
+
+          const apiRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
           });
 
-          const prompt = "Please parse this CV and extract the requested fields. Ensure skills is an array of strings.";
-          const result = await model.generateContent([
-            prompt,
-            { inlineData: { data: base64Data, mimeType: 'application/pdf' } }
-          ]);
+          if (!apiRes.ok) throw new Error(`Gemini API Error: ${apiRes.statusText}`);
+          const data = await apiRes.json();
           
-          const text = result.response.text();
-          const parsed = JSON.parse(text);
+          const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!textResponse) throw new Error("Invalid response structure from Gemini API");
+
+          const parsed = JSON.parse(textResponse);
 
           setProfileData({
             user_name: parsed.user_name || '',
@@ -276,7 +286,7 @@ export default function OnboardingScreen({ navigation }) {
           console.error("Gemini Parse Error:", apiError);
           Sentry.captureException(apiError);
           setCvLoading(false);
-          Alert.alert('AI Parsing Failed', 'Could not extract data from the CV. Please fill manually.');
+          Alert.alert('AI Parsing Failed', `Error: ${apiError.message || JSON.stringify(apiError)}`);
           setStep(4.5); // Fallback to guided form
         }
       }
