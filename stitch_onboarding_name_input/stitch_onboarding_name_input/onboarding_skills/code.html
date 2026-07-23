@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Jinni - Add Skills</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS (with theme config embedded) -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#1b1c1c",
+                    "on-primary-fixed-variant": "#832600",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e4e2e1",
+                    "on-error": "#ffffff",
+                    "primary": "#ab3500",
+                    "primary-fixed": "#ffdbd0",
+                    "secondary-container": "#e3e0d2",
+                    "surface": "#fbf9f8",
+                    "on-secondary-container": "#656358",
+                    "background": "#fbf9f8",
+                    "on-tertiary": "#ffffff",
+                    "tertiary": "#6d5b4d",
+                    "surface-container-low": "#f6f3f2",
+                    "inverse-on-surface": "#f3f0f0",
+                    "surface-container-high": "#eae8e7",
+                    "outline": "#8d7168",
+                    "tertiary-container": "#ab9686",
+                    "on-surface": "#1b1c1c",
+                    "on-tertiary-fixed-variant": "#544437",
+                    "tertiary-fixed": "#f7decc",
+                    "surface-container": "#f0eded",
+                    "secondary-fixed": "#e6e2d5",
+                    "on-secondary-fixed-variant": "#48473d",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#dcd9d9",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#5f1900",
+                    "primary-container": "#ff6b35",
+                    "on-secondary": "#ffffff",
+                    "inverse-primary": "#ffb59d",
+                    "surface-variant": "#e4e2e1",
+                    "inverse-surface": "#303030",
+                    "secondary": "#605f54",
+                    "primary-fixed-dim": "#ffb59d",
+                    "outline-variant": "#e1bfb5",
+                    "on-surface-variant": "#594139",
+                    "error": "#ba1a1a",
+                    "secondary-fixed-dim": "#cac7b9",
+                    "on-tertiary-container": "#3e2f23",
+                    "on-tertiary-fixed": "#25190e",
+                    "tertiary-fixed-dim": "#dac2b1",
+                    "surface-bright": "#fbf9f8",
+                    "surface-tint": "#ab3500",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#1c1c14",
+                    "on-primary-fixed": "#390c00"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-sm": "0.5rem",
+                    "stack-lg": "2rem",
+                    "margin-mobile": "1.25rem",
+                    "gutter": "1rem",
+                    "margin-desktop": "2.5rem",
+                    "stack-md": "1rem"
+            },
+            "fontFamily": {
+                    "label-md": ["Plus Jakarta Sans", "sans-serif"],
+                    "headline-xl": ["Plus Jakarta Sans", "sans-serif"],
+                    "body-lg": ["Plus Jakarta Sans", "sans-serif"],
+                    "body-md": ["Plus Jakarta Sans", "sans-serif"],
+                    "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+                    "caption": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-xl": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "caption": ["12px", {"lineHeight": "16px", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        /* Base styles from guidance */
+        body {
+            background-color: #F9F5E7; /* Warm Cream Level 0 */
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Progress Bar Animation */
+        .progress-bar-fill {
+            transition: width 0.4s ease-out;
+        }
+
+        /* Chip Animations */
+        .chip {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .chip:active {
+            transform: scale(0.95);
+        }
+
+        /* Hide scrollbar for pinned skills row but allow horizontal scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        
+        /* Custom Input Focus */
+        .focus-ring:focus-within {
+            border-color: #ff6b35; /* primary-container approx for vibrant orange */
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-background min-h-screen flex flex-col relative pb-safe">
+<!-- Top Navigation & Progress -->
+<header class="sticky top-0 z-50 bg-background pt-4 pb-2 px-margin-mobile">
+<div class="flex items-center justify-between mb-stack-md">
+<!-- Back Button -->
+<button aria-label="Go back" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+<span class="font-label-md text-label-md text-on-surface-variant">Step 5 of 8</span>
+<div class="w-10 h-10"></div> <!-- Spacer for centering -->
+</div>
+<!-- Segmented Progress Bar -->
+<div class="flex gap-1 w-full h-1.5 px-1">
+<div class="flex-1 rounded-full bg-primary-container"></div>
+<div class="flex-1 rounded-full bg-primary-container"></div>
+<div class="flex-1 rounded-full bg-primary-container"></div>
+<div class="flex-1 rounded-full bg-primary-container"></div>
+<div class="flex-1 rounded-full bg-primary-container relative overflow-hidden">
+<div class="absolute inset-0 bg-primary-container"></div>
+</div>
+<div class="flex-1 rounded-full bg-on-background opacity-10"></div>
+<div class="flex-1 rounded-full bg-on-background opacity-10"></div>
+<div class="flex-1 rounded-full bg-on-background opacity-10"></div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col px-margin-mobile pt-stack-md pb-[100px]">
+<!-- Headers -->
+<div class="mb-stack-lg">
+<h1 class="font-headline-xl text-headline-xl text-on-background mb-stack-sm tracking-tight">What are you great at?</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant leading-relaxed">Tap to add — we've pre-picked a few based on your role.</p>
+</div>
+<!-- Selected Skills (Pinned Horizontal Row) -->
+<div class="mb-stack-lg">
+<h2 class="font-label-md text-label-md text-on-surface-variant mb-stack-sm uppercase tracking-wider">Your Skills</h2>
+<div class="flex overflow-x-auto gap-2 py-1 no-scrollbar -mx-margin-mobile px-margin-mobile" id="selected-skills-container">
+<!-- Pre-selected Chips -->
+<button class="chip flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md shrink-0 border-2 border-transparent">
+                    React
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="chip flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md shrink-0 border-2 border-transparent">
+                    Python
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="chip flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md shrink-0 border-2 border-transparent">
+                    Git
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="chip flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md shrink-0 border-2 border-transparent">
+                    UI/UX Design
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+<!-- Search Input -->
+<div class="mb-stack-lg">
+<div class="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-xl h-[52px] focus-ring transition-colors shadow-[0px_4px_20px_rgba(51,51,51,0.04)]">
+<span class="material-symbols-outlined absolute left-4 text-on-surface-variant">search</span>
+<input class="w-full h-full bg-transparent border-none focus:ring-0 pl-12 pr-4 font-body-md text-body-md text-on-background placeholder:text-on-surface-variant rounded-xl" id="skill-search" placeholder="Search or add a skill..." type="text"/>
+</div>
+</div>
+<!-- Suggested Skills Grid -->
+<div class="flex-1">
+<h2 class="font-label-md text-label-md text-on-surface-variant mb-stack-sm uppercase tracking-wider">Suggested</h2>
+<div class="flex flex-wrap gap-2" id="suggested-skills-container">
+<!-- Suggestion Chips (Outlined) -->
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">SQL</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">AWS</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">Node.js</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">Docker</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">TypeScript</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">GraphQL</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">Kubernetes</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">Figma</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">Tailwind CSS</button>
+<button class="chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low">PostgreSQL</button>
+</div>
+</div>
+</main>
+<!-- Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full p-margin-mobile bg-gradient-to-t from-background via-background to-transparent pt-8 pb-safe z-40">
+<button class="w-full h-[56px] bg-primary-container hover:bg-primary text-on-primary-container rounded-full font-label-md text-label-md flex items-center justify-center shadow-lg transition-colors">
+            Continue
+        </button>
+</div>
+<!-- Interaction Script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const suggestionsContainer = document.getElementById('suggested-skills-container');
+            const selectedContainer = document.getElementById('selected-skills-container');
+            const searchInput = document.getElementById('skill-search');
+
+            // Handle suggestion click (Move to selected)
+            suggestionsContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.suggestion-chip');
+                if (!btn) return;
+
+                const skillName = btn.textContent;
+                
+                // Remove from suggestions
+                btn.remove();
+
+                // Create selected chip
+                const selectedChip = document.createElement('button');
+                selectedChip.className = 'chip flex items-center gap-1.5 px-4 py-2 bg-primary-container text-on-primary-container rounded-full font-label-md text-label-md shrink-0 border-2 border-transparent opacity-0 transform scale-90 transition-all duration-300';
+                selectedChip.innerHTML = `
+                    ${skillName}
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                `;
+
+                // Add to selected container
+                selectedContainer.appendChild(selectedChip);
+                
+                // Animate in
+                requestAnimationFrame(() => {
+                    selectedChip.classList.remove('opacity-0', 'scale-90');
+                });
+                
+                // Scroll selected container to end
+                selectedContainer.scrollTo({
+                    left: selectedContainer.scrollWidth,
+                    behavior: 'smooth'
+                });
+            });
+
+            // Handle selected click (Remove/Move back to suggestions)
+            selectedContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.chip');
+                if (!btn) return;
+
+                const skillName = btn.textContent.trim().replace('close', '').trim(); // hacky way to extract name without icon text
+                
+                // Animate out
+                btn.style.transform = 'scale(0.8)';
+                btn.style.opacity = '0';
+                
+                setTimeout(() => {
+                    btn.remove();
+                    
+                    // Re-add to suggestions if it matches current search
+                    const searchTerm = searchInput.value.toLowerCase();
+                    if (skillName.toLowerCase().includes(searchTerm) || searchTerm === '') {
+                        const suggestionChip = document.createElement('button');
+                        suggestionChip.className = 'chip suggestion-chip px-4 py-2 bg-surface-container-lowest border border-outline-variant text-on-background rounded-full font-label-md text-label-md hover:bg-surface-container-low opacity-0 transform scale-90 transition-all duration-300';
+                        suggestionChip.textContent = skillName;
+                        
+                        suggestionsContainer.appendChild(suggestionChip);
+                        
+                        requestAnimationFrame(() => {
+                            suggestionChip.classList.remove('opacity-0', 'scale-90');
+                        });
+                    }
+                }, 200);
+            });
+
+            // Simple Search Filter
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const suggestions = suggestionsContainer.querySelectorAll('.suggestion-chip');
+                
+                suggestions.forEach(chip => {
+                    if (chip.textContent.toLowerCase().includes(term)) {
+                        chip.style.display = 'inline-block';
+                    } else {
+                        chip.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

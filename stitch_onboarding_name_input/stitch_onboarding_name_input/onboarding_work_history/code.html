@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Jinni - Work History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-background": "#1b1c1c",
+                        "on-primary-fixed-variant": "#832600",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "on-error": "#ffffff",
+                        "primary": "#ab3500",
+                        "primary-fixed": "#ffdbd0",
+                        "secondary-container": "#e3e0d2",
+                        "surface": "#fbf9f8",
+                        "on-secondary-container": "#656358",
+                        "background": "#fbf9f8",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#6d5b4d",
+                        "surface-container-low": "#f6f3f2",
+                        "inverse-on-surface": "#f3f0f0",
+                        "surface-container-high": "#eae8e7",
+                        "outline": "#8d7168",
+                        "tertiary-container": "#ab9686",
+                        "on-surface": "#1b1c1c",
+                        "on-tertiary-fixed-variant": "#544437",
+                        "tertiary-fixed": "#f7decc",
+                        "surface-container": "#f0eded",
+                        "secondary-fixed": "#e6e2d5",
+                        "on-secondary-fixed-variant": "#48473d",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#dcd9d9",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#5f1900",
+                        "primary-container": "#ff6b35",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#ffb59d",
+                        "surface-variant": "#e4e2e1",
+                        "inverse-surface": "#303030",
+                        "secondary": "#605f54",
+                        "primary-fixed-dim": "#ffb59d",
+                        "outline-variant": "#e1bfb5",
+                        "on-surface-variant": "#594139",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#cac7b9",
+                        "on-tertiary-container": "#3e2f23",
+                        "on-tertiary-fixed": "#25190e",
+                        "tertiary-fixed-dim": "#dac2b1",
+                        "surface-bright": "#fbf9f8",
+                        "surface-tint": "#ab3500",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#1c1c14",
+                        "on-primary-fixed": "#390c00"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "2rem",
+                        "margin-mobile": "1.25rem",
+                        "gutter": "1rem",
+                        "margin-desktop": "2.5rem",
+                        "stack-md": "1rem",
+                        "safe": "env(safe-area-inset-bottom)"
+                    },
+                    fontFamily: {
+                        "label-md": ["Plus Jakarta Sans"],
+                        "headline-xl": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "caption": ["Plus Jakarta Sans"]
+                    },
+                    fontSize: {
+                        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }],
+                        "headline-xl": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "caption": ["12px", { lineHeight: "16px", fontWeight: "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #F9F5E7; } /* Override background to match Brand & Style guide */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0px 4px 20px rgba(51, 51, 51, 0.08);
+        }
+        .active-card {
+            box-shadow: 0px 12px 30px rgba(51, 51, 51, 0.12);
+        }
+        
+        /* Custom scrollwheel styles for demo purposes */
+        .scroll-wheel-container {
+            height: 120px;
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            scrollbar-width: none; /* Firefox */
+        }
+        .scroll-wheel-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari and Opera */
+        }
+        .scroll-wheel-item {
+            height: 40px;
+            scroll-snap-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .scroll-wheel-item.selected {
+            opacity: 1;
+            font-weight: bold;
+            color: var(--color-primary);
+            font-size: 1.1em;
+        }
+        .scroll-fade-top, .scroll-fade-bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 40px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .scroll-fade-top {
+            top: 0;
+            background: linear-gradient(to bottom, white, transparent);
+        }
+        .scroll-fade-bottom {
+            bottom: 0;
+            background: linear-gradient(to top, white, transparent);
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ff6b35;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ff6b35;
+        }
+    </style>
+</head>
+<body class="text-on-background min-h-screen flex flex-col font-body-md antialiased pb-safe">
+<!-- TopAppBar equivalent (transactional, so no full nav, just back and progress) -->
+<header class="flex flex-col px-margin-mobile pt-8 pb-4 w-full max-w-xl mx-auto bg-[#F9F5E7] sticky top-0 z-50">
+<div class="flex items-center justify-between mb-4">
+<button aria-label="Go back" class="p-2 -ml-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+</button>
+<span class="font-label-md text-label-md text-on-surface-variant">Step 3 of 8</span>
+<div class="w-10"></div> <!-- Placeholder for balance -->
+</div>
+<!-- Progress Bar -->
+<div class="flex gap-1 h-2 w-full">
+<div class="flex-1 bg-primary rounded-full"></div>
+<div class="flex-1 bg-primary rounded-full"></div>
+<div class="flex-1 bg-primary rounded-full"></div>
+<div class="flex-1 bg-[#1b1c1c] bg-opacity-10 rounded-full"></div>
+<div class="flex-1 bg-[#1b1c1c] bg-opacity-10 rounded-full"></div>
+<div class="flex-1 bg-[#1b1c1c] bg-opacity-10 rounded-full"></div>
+<div class="flex-1 bg-[#1b1c1c] bg-opacity-10 rounded-full"></div>
+<div class="flex-1 bg-[#1b1c1c] bg-opacity-10 rounded-full"></div>
+</div>
+</header>
+<main class="flex-1 px-margin-mobile w-full max-w-xl mx-auto flex flex-col gap-stack-lg pb-32">
+<!-- Header Section -->
+<section class="flex flex-col gap-stack-sm mt-4">
+<h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight">Tell us about this role.</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">You can add more later.</p>
+</section>
+<!-- Form Canvas (Bento-style layout on desktop, stacked on mobile) -->
+<section class="flex flex-col gap-stack-md">
+<!-- Company Name -->
+<div class="glass-card rounded-xl p-4 flex flex-col gap-stack-sm relative focus-within:active-card transition-shadow">
+<label class="font-label-md text-label-md text-on-surface" for="company">Company Name</label>
+<div class="relative">
+<input class="w-full bg-white border border-[#E0DBCB] rounded-xl px-4 py-3 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" id="company" placeholder="e.g. Acme Corp" type="text" value="Stripe"/>
+<!-- Simulated Autocomplete Dropdown -->
+<div class="absolute top-full left-0 right-0 mt-1 bg-white border border-[#E0DBCB] rounded-xl shadow-lg z-20 overflow-hidden hidden" id="companyDropdown">
+<button class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low text-left">
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center text-primary font-bold">S</div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Stripe</div>
+<div class="font-caption text-caption text-on-surface-variant">Financial Services</div>
+</div>
+</button>
+<button class="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low text-left border-t border-surface-container">
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center text-primary font-bold">S</div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Spotify</div>
+<div class="font-caption text-caption text-on-surface-variant">Entertainment</div>
+</div>
+</button>
+</div>
+</div>
+</div>
+<!-- Role Title -->
+<div class="glass-card rounded-xl p-4 flex flex-col gap-stack-sm focus-within:active-card transition-shadow">
+<label class="font-label-md text-label-md text-on-surface" for="role">Role Title</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-3.5 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full bg-white border border-[#E0DBCB] rounded-xl pl-11 pr-4 py-3 font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors" id="role" placeholder="Search roles..." type="text"/>
+</div>
+<!-- Filtered Chips -->
+<div class="flex flex-wrap gap-2 mt-2">
+<button class="px-4 py-1.5 rounded-full bg-[#FFE6D4] text-on-surface font-label-md text-label-md hover:bg-primary hover:text-white transition-colors">Product Manager</button>
+<button class="px-4 py-1.5 rounded-full bg-primary text-white font-label-md text-label-md shadow-sm">Product Designer</button>
+<button class="px-4 py-1.5 rounded-full bg-[#FFE6D4] text-on-surface font-label-md text-label-md hover:bg-primary hover:text-white transition-colors">UX Researcher</button>
+</div>
+</div>
+<!-- Dates -->
+<div class="glass-card rounded-xl p-4 flex flex-col gap-stack-md">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface">Dates</span>
+<!-- Toggle Switch -->
+<div class="flex items-center gap-2">
+<span class="font-caption text-caption text-on-surface-variant">I currently work here</span>
+<div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out border-[#E0DBCB] right-0 translate-x-full border-primary" id="currentRoleToggle" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-container-high cursor-pointer bg-primary" for="currentRoleToggle"></label>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<!-- Start Date Picker (Simulated) -->
+<div class="relative border border-[#E0DBCB] rounded-xl bg-white overflow-hidden" style="height: 120px;">
+<div class="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white to-transparent z-10 pointer-events-none"></div>
+<div class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none"></div>
+<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 border-y border-surface-container z-0"></div>
+<div class="scroll-wheel-container text-center relative z-0 py-10" id="startYearWheel">
+<div class="scroll-wheel-item font-body-md text-body-md">2018</div>
+<div class="scroll-wheel-item font-body-md text-body-md">2019</div>
+<div class="scroll-wheel-item font-body-md text-body-md">2020</div>
+<div class="scroll-wheel-item font-body-md text-body-md selected">2021</div>
+<div class="scroll-wheel-item font-body-md text-body-md">2022</div>
+<div class="scroll-wheel-item font-body-md text-body-md">2023</div>
+<div class="scroll-wheel-item font-body-md text-body-md">2024</div>
+</div>
+</div>
+<!-- End Date Picker (De-emphasized) -->
+<div class="relative border border-[#E0DBCB] rounded-xl bg-surface-container-low opacity-50 overflow-hidden" id="endDateContainer" style="height: 120px;">
+<div class="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+<div class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 border-y border-surface-container z-0"></div>
+<div class="flex items-center justify-center h-full z-0 relative font-body-md text-body-md text-on-surface-variant">
+                            Present
+                        </div>
+</div>
+</div>
+</div>
+<!-- Subsection: Your biggest wins -->
+<div class="mt-4 flex flex-col gap-stack-sm">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Your biggest wins</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Tap a prompt to get started, then edit it your way.</p>
+<!-- Prompt Pills -->
+<div class="flex flex-wrap gap-2 mt-2">
+<button class="px-4 py-2 rounded-full bg-white border border-[#E0DBCB] text-on-surface font-label-md text-label-md hover:border-primary transition-colors flex items-center gap-2 shadow-sm">Built something <span class="text-[16px]">🛠️</span></button>
+<button class="px-4 py-2 rounded-full bg-white border border-[#E0DBCB] text-on-surface font-label-md text-label-md hover:border-primary transition-colors flex items-center gap-2 shadow-sm">Fixed a problem <span class="text-[16px]">🔧</span></button>
+<button class="px-4 py-2 rounded-full bg-[#FFE6D4] text-primary border border-primary font-label-md text-label-md flex items-center gap-2 shadow-sm">Grew a number <span class="text-[16px]">📈</span></button>
+</div>
+<!-- Text Area -->
+<div class="glass-card rounded-xl p-4 flex flex-col gap-stack-sm focus-within:active-card transition-shadow mt-2">
+<textarea class="w-full bg-transparent border-none resize-none font-body-md text-body-md text-on-surface focus:ring-0 p-0 placeholder:text-on-surface-variant placeholder:opacity-50 min-h-[100px]" placeholder="I built [X] which resulted in [Y]...">I grew user engagement by implementing a new onboarding flow, which resulted in a significant increase in retention.</textarea>
+<div class="h-px w-full bg-surface-container my-2"></div>
+<!-- Numeric Input -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="numbers">Any numbers to back it up?</label>
+<input class="w-full bg-transparent border-none p-0 font-body-md text-body-md text-on-surface focus:ring-0 placeholder:text-on-surface-variant placeholder:opacity-50" id="numbers" placeholder="e.g. 30%, ₦2M, 5 people" type="text" value="30%"/>
+</div>
+</div>
+</div>
+<!-- Secondary Action -->
+<button class="mt-4 py-3 rounded-full border-2 border-primary text-primary font-label-md text-label-md hover:bg-primary hover:text-white transition-colors w-full md:w-auto md:px-8 self-center md:self-start">
+                + Add another job
+            </button>
+</section>
+</main>
+<!-- Bottom Action Bar (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-8 pb-4 px-margin-mobile z-50">
+<div class="max-w-xl mx-auto">
+<button class="w-full bg-primary text-white h-14 rounded-full font-label-md text-label-md shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                Continue
+                <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<script>
+        // Simple interactions for demo
+        document.getElementById('company').addEventListener('focus', function() {
+            document.getElementById('companyDropdown').classList.remove('hidden');
+        });
+        document.getElementById('company').addEventListener('blur', function() {
+            setTimeout(() => {
+                document.getElementById('companyDropdown').classList.add('hidden');
+            }, 200);
+        });
+
+        const toggle = document.getElementById('currentRoleToggle');
+        const endContainer = document.getElementById('endDateContainer');
+        
+        // Initial state
+        if (toggle.checked) {
+            endContainer.classList.add('opacity-50', 'bg-surface-container-low');
+            endContainer.classList.remove('bg-white');
+            endContainer.innerHTML = `
+                <div class="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+                <div class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+                <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 border-y border-surface-container z-0"></div>
+                <div class="flex items-center justify-center h-full z-0 relative font-body-md text-body-md text-on-surface-variant">Present</div>
+            `;
+        }
+
+        toggle.addEventListener('change', function() {
+            if(this.checked) {
+                endContainer.classList.add('opacity-50', 'bg-surface-container-low');
+                endContainer.classList.remove('bg-white');
+                endContainer.innerHTML = `
+                    <div class="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-surface-container-low to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 border-y border-surface-container z-0"></div>
+                    <div class="flex items-center justify-center h-full z-0 relative font-body-md text-body-md text-on-surface-variant">Present</div>
+                `;
+            } else {
+                endContainer.classList.remove('opacity-50', 'bg-surface-container-low');
+                endContainer.classList.add('bg-white');
+                // Reconstruct scroll wheel for end date
+                endContainer.innerHTML = `
+                    <div class="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-white to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none"></div>
+                    <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 border-y border-surface-container z-0"></div>
+                    <div class="scroll-wheel-container text-center relative z-0 py-10" id="endYearWheel">
+                        <div class="scroll-wheel-item font-body-md text-body-md">2021</div>
+                        <div class="scroll-wheel-item font-body-md text-body-md">2022</div>
+                        <div class="scroll-wheel-item font-body-md text-body-md">2023</div>
+                        <div class="scroll-wheel-item font-body-md text-body-md selected">2024</div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body></html>

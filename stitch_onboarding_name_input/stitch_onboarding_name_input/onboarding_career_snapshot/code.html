@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Jinni - Career Snapshot</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-background": "#1b1c1c",
+                      "on-primary-fixed-variant": "#832600",
+                      "on-primary": "#ffffff",
+                      "surface-container-highest": "#e4e2e1",
+                      "on-error": "#ffffff",
+                      "primary": "#ab3500",
+                      "primary-fixed": "#ffdbd0",
+                      "secondary-container": "#e3e0d2",
+                      "surface": "#fbf9f8",
+                      "on-secondary-container": "#656358",
+                      "background": "#fbf9f8",
+                      "on-tertiary": "#ffffff",
+                      "tertiary": "#6d5b4d",
+                      "surface-container-low": "#f6f3f2",
+                      "inverse-on-surface": "#f3f0f0",
+                      "surface-container-high": "#eae8e7",
+                      "outline": "#8d7168",
+                      "tertiary-container": "#ab9686",
+                      "on-surface": "#1b1c1c",
+                      "on-tertiary-fixed-variant": "#544437",
+                      "tertiary-fixed": "#f7decc",
+                      "surface-container": "#f0eded",
+                      "secondary-fixed": "#e6e2d5",
+                      "on-secondary-fixed-variant": "#48473d",
+                      "on-error-container": "#93000a",
+                      "surface-dim": "#dcd9d9",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-container": "#5f1900",
+                      "primary-container": "#ff6b35",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#ffb59d",
+                      "surface-variant": "#e4e2e1",
+                      "inverse-surface": "#303030",
+                      "secondary": "#605f54",
+                      "primary-fixed-dim": "#ffb59d",
+                      "outline-variant": "#e1bfb5",
+                      "on-surface-variant": "#594139",
+                      "error": "#ba1a1a",
+                      "secondary-fixed-dim": "#cac7b9",
+                      "on-tertiary-container": "#3e2f23",
+                      "on-tertiary-fixed": "#25190e",
+                      "tertiary-fixed-dim": "#dac2b1",
+                      "surface-bright": "#fbf9f8",
+                      "surface-tint": "#ab3500",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed": "#1c1c14",
+                      "on-primary-fixed": "#390c00"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "0.5rem",
+                      "stack-lg": "2rem",
+                      "margin-mobile": "1.25rem",
+                      "gutter": "1rem",
+                      "margin-desktop": "2.5rem",
+                      "stack-md": "1rem"
+              },
+              "fontFamily": {
+                      "label-md": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "headline-xl": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "body-lg": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "body-md": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "headline-lg": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "caption": [
+                              "Plus Jakarta Sans"
+                      ]
+              },
+              "fontSize": {
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "caption": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body {
+            background-color: #F9F5E7; /* Warm Cream background */
+        }
+        .progress-segment {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background-color: rgba(95, 25, 0, 0.1); /* Muted Charcoal at 10% opacity */
+        }
+        .progress-segment.active {
+            background-color: #ff6b35; /* Vibrant Orange indicator */
+        }
+        
+        .chip-base {
+            background-color: #FFE6D4; /* Peach Tint */
+            color: #594139; /* Soft Charcoal */
+        }
+        .chip-active {
+            background-color: #ff6b35; /* Vibrant Orange */
+            color: #ffffff;
+        }
+        
+        /* Focus styles for input */
+        .input-focus-ring:focus-within {
+            border-color: #ff6b35;
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md antialiased min-h-screen flex flex-col items-center justify-center py-8">
+<div class="w-full max-w-md bg-surface-container-lowest rounded-[16px] shadow-[0px_4px_20px_rgba(51,51,51,0.08)] overflow-hidden relative min-h-[85vh] flex flex-col">
+<!-- Top App Bar Area (Custom for Transactional Flow) -->
+<div class="flex items-center justify-between px-margin-mobile pt-margin-mobile pb-stack-md z-10 bg-surface-container-lowest">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<div class="text-label-md font-label-md text-on-surface-variant">Step 2 of 8</div>
+<div class="w-10"></div> <!-- Spacer -->
+</div>
+<!-- Progress Bar -->
+<div class="px-margin-mobile pb-stack-md">
+<div class="flex gap-1">
+<div class="progress-segment active"></div>
+<div class="progress-segment active"></div>
+<div class="progress-segment"></div>
+<div class="progress-segment"></div>
+<div class="progress-segment"></div>
+<div class="progress-segment"></div>
+<div class="progress-segment"></div>
+<div class="progress-segment"></div>
+</div>
+</div>
+<!-- Scrollable Content Canvas -->
+<div class="flex-1 overflow-y-auto px-margin-mobile pb-32">
+<div class="mb-stack-lg">
+<h1 class="text-headline-xl font-headline-xl text-on-background">What are you aiming for?</h1>
+</div>
+<!-- Section 1: Target Role -->
+<div class="mb-stack-lg flex flex-col gap-stack-sm relative">
+<label class="text-label-md font-label-md text-on-surface-variant">Target Role</label>
+<div class="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-xl h-[56px] px-4 input-focus-ring transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mr-2" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full bg-transparent border-none focus:ring-0 p-0 text-body-md font-body-md text-on-background placeholder:text-on-surface-variant" placeholder="e.g. Software Engineer" type="text" value="Software Engineer"/>
+</div>
+<!-- Simulated Dropdown / Suggestions -->
+<div class="absolute top-[88px] left-0 w-full bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg z-20 flex flex-col overflow-hidden">
+<button class="px-4 py-3 text-left hover:bg-surface-container-low text-body-md font-body-md flex items-center justify-between">
+<span class="font-semibold text-primary">Software Engineer</span>
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 0;">check</span>
+</button>
+<button class="px-4 py-3 text-left hover:bg-surface-container-low text-body-md font-body-md text-on-background border-t border-surface-container-high">
+                        Software Architect
+                    </button>
+<button class="px-4 py-3 text-left hover:bg-surface-container-low text-body-md font-body-md text-on-background border-t border-surface-container-high">
+                        Software QA Tester
+                    </button>
+</div>
+<!-- Spacer to account for absolute dropdown in this static mockup -->
+<div class="h-32"></div>
+</div>
+<!-- Section 2: Industry -->
+<div class="mb-stack-lg flex flex-col gap-stack-sm">
+<label class="text-label-md font-label-md text-on-surface-variant">Pick your industry</label>
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-active transition-colors shadow-sm">Tech</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Finance</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Marketing</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Design</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Healthcare</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Education</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Logistics</button>
+<button class="px-4 py-2 rounded-full text-label-md font-label-md chip-base hover:bg-surface-container-high transition-colors">Other</button>
+</div>
+</div>
+<!-- Section 3: Years of Experience -->
+<div class="mb-stack-lg flex flex-col gap-stack-sm">
+<label class="text-label-md font-label-md text-on-surface-variant">Experience level</label>
+<div class="flex bg-surface-container-low p-1 rounded-full w-full">
+<button class="flex-1 py-3 text-center rounded-full text-label-md font-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors">Entry (0-2)</button>
+<button class="flex-1 py-3 text-center rounded-full text-label-md font-label-md bg-surface-container-lowest text-on-background shadow-sm transition-colors">Mid (3-6)</button>
+<button class="flex-1 py-3 text-center rounded-full text-label-md font-label-md text-on-surface-variant hover:bg-surface-container-high transition-colors">Senior (7+)</button>
+</div>
+</div>
+</div>
+<!-- Fixed Bottom Action Area -->
+<div class="absolute bottom-0 left-0 w-full p-margin-mobile bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest to-transparent pt-12 pb-safe">
+<button class="w-full h-[56px] bg-primary-container text-on-primary-container rounded-full text-label-md font-label-md hover:opacity-90 transition-opacity flex items-center justify-center shadow-lg">
+                Continue
+            </button>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Jinni - Basic Identity</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#1b1c1c",
+                        "on-primary-fixed-variant": "#832600",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "on-error": "#ffffff",
+                        "primary": "#ab3500",
+                        "primary-fixed": "#ffdbd0",
+                        "secondary-container": "#e3e0d2",
+                        "surface": "#fbf9f8",
+                        "on-secondary-container": "#656358",
+                        "background": "#fbf9f8",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#6d5b4d",
+                        "surface-container-low": "#f6f3f2",
+                        "inverse-on-surface": "#f3f0f0",
+                        "surface-container-high": "#eae8e7",
+                        "outline": "#8d7168",
+                        "tertiary-container": "#ab9686",
+                        "on-surface": "#1b1c1c",
+                        "on-tertiary-fixed-variant": "#544437",
+                        "tertiary-fixed": "#f7decc",
+                        "surface-container": "#f0eded",
+                        "secondary-fixed": "#e6e2d5",
+                        "on-secondary-fixed-variant": "#48473d",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#dcd9d9",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#5f1900",
+                        "primary-container": "#ff6b35",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#ffb59d",
+                        "surface-variant": "#e4e2e1",
+                        "inverse-surface": "#303030",
+                        "secondary": "#605f54",
+                        "primary-fixed-dim": "#ffb59d",
+                        "outline-variant": "#e1bfb5",
+                        "on-surface-variant": "#594139",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#cac7b9",
+                        "on-tertiary-container": "#3e2f23",
+                        "on-tertiary-fixed": "#25190e",
+                        "tertiary-fixed-dim": "#dac2b1",
+                        "surface-bright": "#fbf9f8",
+                        "surface-tint": "#ab3500",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#1c1c14",
+                        "on-primary-fixed": "#390c00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "2rem",
+                        "margin-mobile": "1.25rem",
+                        "gutter": "1rem",
+                        "margin-desktop": "2.5rem",
+                        "stack-md": "1rem"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Plus Jakarta Sans"],
+                        "headline-xl": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "caption": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .input-focus-ring:focus-within {
+            border-color: #ab3500; /* primary color */
+            outline: none;
+            box-shadow: 0 0 0 1px #ab3500;
+        }
+        
+        /* Floating label styles */
+        .floating-input:focus + .floating-label,
+        .floating-input:not(:placeholder-shown) + .floating-label {
+            transform: translateY(-50%) scale(0.85);
+            top: 0;
+            background-color: white;
+            padding: 0 4px;
+            color: #ab3500;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-full flex flex-col antialiased">
+<!-- Top Navigation (Shell suppressed for linear onboarding, using minimal back action if needed, but per prompt just progress bar) -->
+<!-- Progress Bar -->
+<div class="w-full px-margin-mobile pt-8 pb-4 bg-surface top-0 sticky z-10">
+<div class="flex items-center justify-between mb-stack-sm">
+<span class="font-label-md text-label-md text-secondary">Step 1 of 8</span>
+</div>
+<div class="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden flex gap-1">
+<div class="h-full bg-primary w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+<div class="h-full bg-surface-container-high w-1/8 rounded-full" style="width: 12.5%;"></div>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto px-margin-mobile pb-24 pt-4 w-full max-w-md mx-auto">
+<header class="mb-stack-lg">
+<h1 class="font-headline-xl text-headline-xl text-on-surface mb-stack-sm">Let's start with the basics.</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Takes 2 minutes, promise.</p>
+</header>
+<form class="flex flex-col gap-stack-lg">
+<!-- Full Name -->
+<div class="relative bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm input-focus-ring transition-all duration-200">
+<input class="floating-input w-full bg-transparent px-4 py-4 rounded-xl border-none focus:ring-0 text-on-surface font-body-md" id="fullName" placeholder=" " required="" type="text"/>
+<label class="floating-label absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant transition-all duration-200 pointer-events-none font-body-md" for="fullName">Full Name</label>
+</div>
+<!-- Phone Number -->
+<div class="flex gap-2">
+<div class="relative flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm w-1/3 min-w-[100px] justify-center px-2">
+<select class="w-full bg-transparent border-none focus:ring-0 text-on-surface font-body-md appearance-none pl-2 pr-6 z-10 cursor-pointer">
+<option selected="" value="+234">+234</option>
+<option value="+1">+1</option>
+<option value="+44">+44</option>
+</select>
+<span class="material-symbols-outlined text-on-surface-variant absolute right-2 pointer-events-none text-[20px]" data-icon="expand_more">expand_more</span>
+</div>
+<div class="relative flex-1 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm input-focus-ring transition-all duration-200">
+<input class="floating-input w-full bg-transparent px-4 py-4 rounded-xl border-none focus:ring-0 text-on-surface font-body-md" id="phone" placeholder=" " required="" type="tel"/>
+<label class="floating-label absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant transition-all duration-200 pointer-events-none font-body-md" for="phone">Phone Number</label>
+</div>
+</div>
+<!-- Email -->
+<div class="relative bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm input-focus-ring transition-all duration-200">
+<input class="floating-input w-full bg-transparent px-4 py-4 rounded-xl border-none focus:ring-0 text-on-surface font-body-md" id="email" placeholder=" " required="" type="email"/>
+<label class="floating-label absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant transition-all duration-200 pointer-events-none font-body-md" for="email">Email</label>
+</div>
+<!-- Location (Autocomplete) -->
+<div class="relative">
+<div class="relative flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm input-focus-ring transition-all duration-200 z-20">
+<span class="material-symbols-outlined pl-4 text-on-surface-variant text-[20px]" data-icon="location_on">location_on</span>
+<input class="w-full bg-transparent px-3 py-4 rounded-xl border-none focus:ring-0 text-on-surface font-body-md" id="location" placeholder="Search city..." type="text"/>
+</div>
+<!-- Autocomplete Suggestions (Simulated visible state for design) -->
+<div class="absolute top-full left-0 w-full mt-2 bg-surface-container-lowest border border-surface-variant rounded-xl shadow-lg z-10 overflow-hidden flex flex-col p-2 gap-1">
+<button class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low transition-colors text-left w-full" type="button">
+<div class="bg-primary-fixed w-8 h-8 rounded-full flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[18px]" data-icon="map">map</span>
+</div>
+<span class="font-body-md text-on-surface">Lagos, Nigeria</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low transition-colors text-left w-full" type="button">
+<div class="bg-primary-fixed w-8 h-8 rounded-full flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[18px]" data-icon="map">map</span>
+</div>
+<span class="font-body-md text-on-surface">Abuja, Nigeria</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low transition-colors text-left w-full" type="button">
+<div class="bg-primary-fixed w-8 h-8 rounded-full flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[18px]" data-icon="map">map</span>
+</div>
+<span class="font-body-md text-on-surface">Ibadan, Nigeria</span>
+</button>
+</div>
+</div>
+</form>
+</main>
+<!-- Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full p-margin-mobile bg-surface/90 backdrop-blur-md z-30 pb-safe">
+<div class="max-w-md mx-auto">
+<!-- Disabled state as requested -->
+<button class="w-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md py-4 rounded-full flex items-center justify-center transition-all cursor-not-allowed opacity-80" disabled="" type="button">
+                Continue
+            </button>
+</div>
+</div>
+<!-- Script to handle floating labels slightly if inputs are filled manually for demo purposes -->
+<script>
+        const inputs = document.querySelectorAll('.floating-input');
+        inputs.forEach(input => {
+            // Trigger styling if browser autofills
+            setTimeout(() => {
+                if(input.value) {
+                    input.classList.add('has-value');
+                }
+            }, 100);
+            
+            input.addEventListener('input', () => {
+                if(input.value) {
+                    input.classList.add('has-value');
+                } else {
+                    input.classList.remove('has-value');
+                }
+            });
+        });
+    </script>
+</body></html>

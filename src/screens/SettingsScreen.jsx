@@ -549,10 +549,55 @@ export default function SettingsScreen({ navigation, route }) {
           if (error) {
             Alert.alert('Error', error.message);
           }
-          navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+          navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
         }
       }
     ]);
+  };
+
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? All your profile data, matches, and messages will be erased. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setSaving(true);
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                // 1. Try RPC call
+                const { error: rpcErr } = await supabase.rpc('delete_user_account');
+                if (rpcErr) {
+                  // Fallback manual table cleanup
+                  const tableName = isEmployer ? 'employer_profiles' : 'seeker_profiles';
+                  await supabase.from(tableName).delete().eq('id', user.id);
+                  await supabase.from('profiles').delete().eq('id', user.id);
+                  await supabase.from('matches').delete().eq('user_id', user.id);
+                  if (isEmployer) {
+                    await supabase.from('jobs').delete().eq('employer_id', user.id);
+                  }
+                }
+              }
+
+              // Sign out session & clear cache
+              await supabase.auth.signOut();
+              await AsyncStorage.clear();
+
+              navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
+            } catch (err) {
+              console.warn('Account deletion failed:', err);
+              Alert.alert('Error', `Account deletion failed: ${err.message || err}`);
+            } finally {
+              setSaving(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -568,6 +613,25 @@ export default function SettingsScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
+        {/* Premium Upgrade */}
+        <View style={styles.section}>
+          <BounceButton 
+            style={[styles.settingRow, { backgroundColor: colors.brand.orange, borderColor: colors.brand.orange, paddingVertical: 14 }]}
+            onPress={() => navigation.navigate('Premium')}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Feather name="star" size={20} color="#FFF" />
+              </View>
+              <View>
+                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Jinni Premium</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 2 }}>Upgrade your experience</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={20} color="#FFF" />
+          </BounceButton>
+        </View>
+
         {/* Profile Settings */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.text.hint }]}>PROFILE</Text>
@@ -588,10 +652,10 @@ export default function SettingsScreen({ navigation, route }) {
         {/* CV Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.text.hint }]}>CV / RESUME</Text>
-          <View style={{ backgroundColor: 'rgba(6, 182, 212, 0.08)', padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(6, 182, 212, 0.2)' }}>
+          <View style={{ padding: 12, borderRadius: 12, marginBottom: 12, backgroundColor: colors.bg.card }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Feather name="zap" size={14} color="#0891b2" />
-              <Text style={{ fontSize: 12, color: '#0891b2', fontWeight: '600', flex: 1 }}>
+              <Feather name="zap" size={14} color={colors.text.secondary} />
+              <Text style={{ fontSize: 12, color: colors.text.secondary, fontWeight: '500', flex: 1 }}>
                 Upload a new CV to automatically update your profile details via Genie AI.
               </Text>
             </View>
@@ -676,7 +740,25 @@ export default function SettingsScreen({ navigation, route }) {
           </BounceButton>
         </View>
 
+        {/* Danger Zone */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: '#EF4444' }]}>DANGER ZONE</Text>
+          <BounceButton 
+            style={[styles.settingRow, { backgroundColor: 'rgba(239, 68, 68, 0.05)', borderWidth: 0 }]}
+            onPress={handleDeleteAccount}
+          >
+            <View style={styles.settingLeft}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <Feather name="trash-2" size={20} color="#EF4444" />
+              </View>
+              <Text style={[styles.settingText, { color: '#EF4444' }]}>Delete Account</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="rgba(239, 68, 68, 0.5)" />
+          </BounceButton>
+        </View>
+
       </ScrollView>
+
 
       {/* ── Edit Profile Modal ── */}
       <Modal visible={editing} transparent animationType="none" statusBarTranslucent={true}>
@@ -1111,7 +1193,6 @@ const styles = StyleSheet.create({
   cvEditRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#F0FDF4', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#BBF7D0',
   },
   cvFileName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#065F46' },
   cvReplaceBtn: { backgroundColor: '#FFF0E8', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },

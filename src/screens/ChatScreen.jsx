@@ -7,6 +7,7 @@ import {
   LayoutAnimation, UIManager,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import Reanimated, { SlideInRight, SlideInLeft, FadeInUp } from 'react-native-reanimated';
 
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -86,18 +87,21 @@ const MessageItem = React.memo(({
 }) => {
   if (item.sender_type === 'system') {
     return (
-      <View style={styles.systemMsgRow}>
+      <Reanimated.View entering={FadeInUp.duration(300)} style={styles.systemMsgRow}>
         <View style={styles.systemMsgBubble}>
           <Text style={styles.systemMsgText}>{item.text}</Text>
         </View>
-      </View>
+      </Reanimated.View>
     );
   }
 
   const isMine = item.sender_type === userType || (userType === 'seeker' && item.sender_type === 'candidate');
 
   const bubble = (
-    <View style={{ width: '100%', marginBottom: (isMine && isLatestOwnMsg) ? 14 : 0 }}>
+    <Reanimated.View 
+      entering={FadeInUp.duration(250)}
+      style={{ width: '100%', marginBottom: (isMine && isLatestOwnMsg) ? 14 : 0 }}
+    >
       <Pressable
         onPress={() => {
           const now = Date.now();
@@ -152,7 +156,7 @@ const MessageItem = React.memo(({
           {item.status === 'seen' ? 'Seen' : item.status === 'delivered' ? 'Delivered' : 'Sent'}
         </Text>
       )}
-    </View>
+    </Reanimated.View>
   );
 
   return (
@@ -513,6 +517,7 @@ export default function ChatScreen({ route, navigation }) {
       reply_to: replyId,
       created_at: new Date().toISOString(),
     };
+    
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {

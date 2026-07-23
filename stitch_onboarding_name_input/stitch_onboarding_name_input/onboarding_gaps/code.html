@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Jinni - CV Builder - Gaps</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#1b1c1c",
+                        "on-primary-fixed-variant": "#832600",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e4e2e1",
+                        "on-error": "#ffffff",
+                        "primary": "#ab3500",
+                        "primary-fixed": "#ffdbd0",
+                        "secondary-container": "#e3e0d2",
+                        "surface": "#fbf9f8",
+                        "on-secondary-container": "#656358",
+                        "background": "#fbf9f8",
+                        "on-tertiary": "#ffffff",
+                        "tertiary": "#6d5b4d",
+                        "surface-container-low": "#f6f3f2",
+                        "inverse-on-surface": "#f3f0f0",
+                        "surface-container-high": "#eae8e7",
+                        "outline": "#8d7168",
+                        "tertiary-container": "#ab9686",
+                        "on-surface": "#1b1c1c",
+                        "on-tertiary-fixed-variant": "#544437",
+                        "tertiary-fixed": "#f7decc",
+                        "surface-container": "#f0eded",
+                        "secondary-fixed": "#e6e2d5",
+                        "on-secondary-fixed-variant": "#48473d",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#dcd9d9",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#5f1900",
+                        "primary-container": "#ff6b35",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#ffb59d",
+                        "surface-variant": "#e4e2e1",
+                        "inverse-surface": "#303030",
+                        "secondary": "#605f54",
+                        "primary-fixed-dim": "#ffb59d",
+                        "outline-variant": "#e1bfb5",
+                        "on-surface-variant": "#594139",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#cac7b9",
+                        "on-tertiary-container": "#3e2f23",
+                        "on-tertiary-fixed": "#25190e",
+                        "tertiary-fixed-dim": "#dac2b1",
+                        "surface-bright": "#fbf9f8",
+                        "surface-tint": "#ab3500",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#1c1c14",
+                        "on-primary-fixed": "#390c00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "0.5rem",
+                        "stack-lg": "2rem",
+                        "margin-mobile": "1.25rem",
+                        "gutter": "1rem",
+                        "margin-desktop": "2.5rem",
+                        "stack-md": "1rem"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Plus Jakarta Sans"],
+                        "headline-xl": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "caption": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        /* Hide scrollbar for clean look */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
+<!-- TopAppBar (From JSON - Strict Mapping) -->
+<header class="flex items-center justify-between px-margin-mobile h-16 w-full max-w-7xl mx-auto bg-surface dark:bg-surface docked full-width top-0 z-50 flat no shadows">
+<button class="text-primary dark:text-primary-fixed hover:bg-surface-container-high dark:hover:bg-surface-container-highest rounded-full transition-colors p-2 active:scale-95 duration-150 ease-in-out flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="text-headline-lg font-headline-lg font-bold text-primary dark:text-primary-container">Jinni</h1>
+<div class="w-10"></div> <!-- Spacer for center alignment -->
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-margin-mobile max-w-2xl mx-auto w-full flex flex-col pb-[120px]">
+<!-- Progress Bar -->
+<div class="flex gap-1 mb-8 pt-4 w-full">
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-primary-container rounded-full"></div>
+<div class="h-1.5 flex-1 bg-surface-dim rounded-full opacity-40"></div>
+<div class="h-1.5 flex-1 bg-surface-dim rounded-full opacity-40"></div>
+</div>
+<!-- Header -->
+<div class="mb-stack-lg">
+<h2 class="text-headline-xl font-headline-xl mb-stack-sm text-on-surface">Any gaps to explain?</h2>
+<p class="text-body-lg font-body-lg text-on-surface-variant">Totally optional — skip if not needed.</p>
+</div>
+<!-- Toggle Row -->
+<div class="flex items-center justify-between bg-surface-container-lowest p-5 rounded-xl shadow-[0px_4px_20px_rgba(51,51,51,0.08)] mb-stack-lg border border-transparent transition-all cursor-pointer" onclick="toggleGapSection()">
+<span class="text-body-md font-body-md font-semibold text-on-surface">I have a gap I'd like to explain</span>
+<!-- Toggle Switch (ON State) -->
+<button class="relative inline-flex h-8 w-14 items-center rounded-full bg-primary-container transition-colors focus:outline-none" id="gap-toggle">
+<span class="inline-block h-6 w-6 translate-x-7 transform rounded-full bg-on-primary transition-transform" id="toggle-thumb"></span>
+</button>
+</div>
+<!-- Expanded Area -->
+<div class="flex flex-col gap-stack-lg transition-all duration-300 origin-top" id="expanded-area">
+<!-- Chips Wrap -->
+<div>
+<label class="block text-label-md font-label-md text-on-surface-variant mb-stack-sm">Common Reasons</label>
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-label-md font-label-md hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Travel</button>
+<button class="px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-label-md font-label-md hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Health</button>
+<button class="px-4 py-2 rounded-full bg-primary text-on-primary text-label-md font-label-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Family</button>
+<button class="px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-label-md font-label-md hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Studies</button>
+<button class="px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-label-md font-label-md hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Freelance</button>
+</div>
+</div>
+<!-- Text Area -->
+<div>
+<label class="sr-only" for="gap-explanation">Explanation</label>
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-body-md font-body-md text-on-surface placeholder:text-outline focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-all resize-none shadow-[0px_4px_20px_rgba(51,51,51,0.04)]" id="gap-explanation" placeholder="I took time to focus on [Family] between [dates]..." rows="4"></textarea>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom Actions -->
+<div class="fixed bottom-0 left-0 w-full bg-gradient-to-t from-background via-background to-transparent pt-12 pb-6 px-margin-mobile">
+<div class="max-w-2xl mx-auto flex flex-col items-center gap-4">
+<button class="w-full h-14 bg-primary-container text-on-primary-container rounded-full text-label-md font-label-md shadow-lg hover:bg-primary transition-colors active:scale-[0.98]">
+                Continue
+            </button>
+<button class="text-primary text-label-md font-label-md bg-transparent hover:underline px-4 py-2">
+                Skip this step
+            </button>
+</div>
+</div>
+<!-- Note: BottomNavBar is intentionally suppressed as this is a linear transactional flow. -->
+<script>
+        // Simple toggle logic for demonstration
+        function toggleGapSection() {
+            const toggle = document.getElementById('gap-toggle');
+            const thumb = document.getElementById('toggle-thumb');
+            const area = document.getElementById('expanded-area');
+            
+            const isOff = toggle.classList.contains('bg-surface-variant');
+            
+            if (isOff) {
+                // Turn ON
+                toggle.classList.remove('bg-surface-variant');
+                toggle.classList.add('bg-primary-container');
+                thumb.classList.remove('translate-x-1');
+                thumb.classList.add('translate-x-7');
+                area.style.opacity = '1';
+                area.style.pointerEvents = 'auto';
+                area.style.transform = 'scaleY(1)';
+                area.style.height = 'auto';
+            } else {
+                // Turn OFF
+                toggle.classList.remove('bg-primary-container');
+                toggle.classList.add('bg-surface-variant');
+                thumb.classList.remove('translate-x-7');
+                thumb.classList.add('translate-x-1');
+                area.style.opacity = '0.5';
+                area.style.pointerEvents = 'none';
+                // Basic visual feedback for off state
+            }
+        }
+    </script>
+</body></html>

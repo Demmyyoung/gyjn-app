@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withRepeat,
-  withSequence, withSpring, SlideInRight, SlideOutLeft, FadeIn, FadeOut
+  withSequence, withSpring, SlideInRight, SlideOutLeft, SlideInLeft, SlideOutRight, FadeIn, FadeOut
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -76,13 +76,23 @@ function SelectionCard({ emoji, label, desc, onPress, colorTheme }) {
 }
 
 // --- Main Wizard Screen ---
-export default function OnboardingScreen({ navigation }) {
+export default function OnboardingScreen({ navigation, route }) {
   const { colors, typography, radii, shadows } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Navigation / Wizard State
-  const [step, setStep] = useState(1);
+  const isLogin = route?.params?.isLogin || false;
+  const [step, setStep] = useState(route?.params?.initialStep || 1);
+  const [animDirection, setAnimDirection] = useState(1);
   const [role, setRole] = useState(null);
+
+  const changeStep = (newStep) => {
+    if (newStep === step) return;
+    setAnimDirection(newStep > step ? 1 : -1);
+    setTimeout(() => {
+      setStep(newStep);
+    }, 10);
+  };
 
   // Auth State
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -90,6 +100,7 @@ export default function OnboardingScreen({ navigation }) {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
   // Profile Generation State
@@ -97,19 +108,39 @@ export default function OnboardingScreen({ navigation }) {
   const [profileData, setProfileData] = useState({
     user_name: '',
     job_type: '',
+    industry: '',
     skills: [],
     experience_level: '',
     about_me: '',
     location: '',
+    phone: '',
+    email: '',
+    company: '',
+    role_title: '',
+    work_wins: '',
+    gaps: '',
+    tone_format: 'Professional & Direct',
   });
   const isNavigating = useRef(false);
+  const scrollViewRef3 = useRef(null);
+
+  console.log('--- RENDERING NEW ONBOARDING SCREEN ---', step);
 
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step === 4.5) setStep(4);
-    else if (step > 1) setStep(step - 1);
+    if (step === 4.6) changeStep(4.5);
+    else if (step === 4.5) changeStep(4.4);
+    else if (step === 4.4) changeStep(4.3);
+    else if (step === 4.3) changeStep(4.2);
+    else if (step === 4.2) changeStep(4.1);
+    else if (step === 4.1) changeStep(4);
+    else if (step === 5) changeStep(4);
+    else if (step > 1) changeStep(step - 1);
     else if (step === 1 && navigation.canGoBack()) navigation.goBack();
   };
+
+  const enteringAnim = animDirection === 1 ? SlideInRight.springify() : SlideInLeft.springify();
+  const exitingAnim = animDirection === 1 ? SlideOutLeft : SlideOutRight;
 
   // Visuals
   const rocketOffset = useSharedValue(0);
@@ -168,13 +199,85 @@ export default function OnboardingScreen({ navigation }) {
     }
   };
 
+  const fetchProfileDirect = async (table, userId, accessToken) => {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    const url = `${supabaseUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(userId)}&select=*&limit=1`;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return rows.length > 0 ? rows[0] : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const handleAuthSuccess = async (user, accessToken) => {
     if (isNavigating.current) return;
+    isNavigating.current = true;
     setGoogleLoading(false);
     setAuthLoading(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Proceed to CV branch
-    setStep(4);
+    
+    try {
+      const empData = await fetchProfileDirect('employer_profiles', user.id, accessToken);
+      if (empData && empData.user_name) {
+        Sentry.setUser({ id: user.id, email: user.email, role: 'employer' });
+        navigation.reset({
+          index: 0,
+          routes: [{
+            name: 'Main',
+            params: {
+              userName: empData.user_name,
+              userRole: empData.user_role || empData.job_type,
+              jobType: empData.job_type,
+              aboutMe: empData.about_me,
+              searchTarget: empData.search_target,
+              userType: 'employer',
+              skills: empData.skills || [],
+              cvUrl: empData.cv_url,
+              category: empData.category,
+              companyName: empData.company_name,
+            }
+          }],
+        });
+        return;
+      }
+
+      const seekerData = await fetchProfileDirect('seeker_profiles', user.id, accessToken);
+      if (seekerData && seekerData.user_name) {
+        Sentry.setUser({ id: user.id, email: user.email, role: 'seeker' });
+        navigation.reset({
+          index: 0,
+          routes: [{
+            name: 'Main',
+            params: {
+              userName: seekerData.user_name,
+              userRole: seekerData.user_role || seekerData.job_type,
+              jobType: seekerData.job_type,
+              aboutMe: seekerData.about_me,
+              searchTarget: seekerData.search_target,
+              userType: 'seeker',
+              skills: seekerData.skills || [],
+              cvUrl: seekerData.cv_url,
+              category: seekerData.category,
+            }
+          }],
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn("Profile check failed in onboarding:", err);
+    }
+    
+    isNavigating.current = false;
+    // Proceed to CV branch for new users
+    changeStep(4);
   };
 
   const handleGoogleSignIn = async () => {
@@ -281,13 +384,13 @@ export default function OnboardingScreen({ navigation }) {
 
           setCvLoading(false);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setStep(5); // Go to Validation
+          changeStep(5); // Go to Validation
         } catch (apiError) {
           console.error("Gemini Parse Error:", apiError);
           Sentry.captureException(apiError);
           setCvLoading(false);
           Alert.alert('AI Parsing Failed', `Error: ${apiError.message || JSON.stringify(apiError)}`);
-          setStep(4.5); // Fallback to guided form
+          changeStep(4.5); // Fallback to guided form
         }
       }
     } catch (e) {
@@ -298,10 +401,72 @@ export default function OnboardingScreen({ navigation }) {
     }
   };
 
-  const handleGuidedFormSubmit = () => {
-    if (!profileData.user_name || !profileData.job_type) return Alert.alert('Required', 'Please enter your name and target role.');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep(5); // Go to validation
+  const generateProfileWithAI = async () => {
+    setCvLoading(true);
+    changeStep(4.6);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+      const prompt = `You are an expert CV writer. The user provided the following details to build their CV:
+Name: ${profileData.user_name}
+Location: ${profileData.location}
+Target Role: ${profileData.job_type}
+Industry: ${profileData.industry}
+Experience Level: ${profileData.experience_level}
+Work History: ${profileData.role_title} at ${profileData.company}. Key wins: ${profileData.work_wins}
+Skills: ${profileData.skills.join(', ')}
+Career Gaps: ${profileData.gaps}
+Tone/Format: ${profileData.tone_format}
+
+Please synthesize this into a professional profile. Extract and format the requested fields. Ensure skills is an array of strings. Generate a compelling 2 sentence 'about_me' bio that reflects the requested tone.`;
+
+      const requestBody = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              user_name: { type: "STRING" },
+              job_type: { type: "STRING" },
+              about_me: { type: "STRING" },
+              experience_level: { type: "STRING" },
+              skills: { type: "ARRAY", items: { type: "STRING" } }
+            },
+            required: ["user_name", "job_type", "about_me", "experience_level", "skills"]
+          }
+        }
+      };
+
+      const apiRes = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+      if (!apiRes.ok) throw new Error(`Gemini API Error: ${apiRes.statusText}`);
+      const data = await apiRes.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textResponse) throw new Error("Invalid response structure from Gemini API");
+      
+      const parsed = JSON.parse(textResponse);
+      
+      setProfileData(prev => ({
+        ...prev,
+        user_name: parsed.user_name || prev.user_name,
+        job_type: parsed.job_type || prev.job_type,
+        skills: parsed.skills || prev.skills,
+        experience_level: parsed.experience_level || prev.experience_level,
+        about_me: parsed.about_me || prev.about_me,
+      }));
+      
+      setCvLoading(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      changeStep(5);
+    } catch (err) {
+      console.error(err);
+      Sentry.captureException(err);
+      setCvLoading(false);
+      Alert.alert('AI Generation Failed', err.message);
+      changeStep(4.5);
+    }
   };
 
   const saveProfileAndLaunch = async () => {
@@ -342,7 +507,7 @@ export default function OnboardingScreen({ navigation }) {
 
   // Step 1: Role Select
   const renderStep1 = () => (
-    <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.stepContainer}>
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={[typography.display, { color: colors.text.primary }]}>You're almost{'\n'}in. </Text>
@@ -353,7 +518,7 @@ export default function OnboardingScreen({ navigation }) {
       <StaggeredList baseDelay={100} style={styles.cards}>
         <SelectionCard
           emoji="🧑‍💻" label="Job Seeker" desc="Swipe on jobs, get matched, land interviews" colorTheme="rgba(255, 107, 44, 0.08)"
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setRole('seeker'); setStep(2); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setRole('seeker'); changeStep(2); }}
         />
         <SelectionCard
           emoji="🏢" label="Employer" desc="Post roles, discover talent, hire fast" colorTheme="rgba(123, 79, 233, 0.08)"
@@ -365,7 +530,7 @@ export default function OnboardingScreen({ navigation }) {
 
   // Step 2: Hype Screen
   const renderStep2 = () => (
-    <Animated.View entering={SlideInRight.springify()} exiting={SlideOutLeft} style={styles.stepContainer}>
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
       <View style={{ flex: 1, justifyContent: 'center', gap: 24 }}>
         <Text style={[typography.display, { color: colors.text.primary }]}>Nice! Let's get you matched with real jobs.</Text>
         <View style={{ gap: 16 }}>
@@ -383,7 +548,7 @@ export default function OnboardingScreen({ navigation }) {
           </View>
         </View>
       </View>
-      <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(3); }}>
+      <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); changeStep(3); }}>
         <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
           <Text style={[typography.button, { color: '#fff' }]}>Let's Go 🚀</Text>
         </LinearGradient>
@@ -393,9 +558,12 @@ export default function OnboardingScreen({ navigation }) {
 
   // Step 3: Social-First Auth
   const renderStep3 = () => (
-    <Animated.View entering={SlideInRight.springify()} exiting={SlideOutLeft} style={styles.stepContainer}>
-      <View style={{ flex: 1, justifyContent: 'center', gap: 20 }}>
-        <Text style={[typography.hero, { color: colors.text.primary, textAlign: 'center', marginBottom: 20 }]}>Create Account</Text>
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
+        <ScrollView ref={scrollViewRef3} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={[typography.hero, { color: colors.text.primary, textAlign: 'center', marginBottom: 20 }]}>
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </Text>
         
         {/* Google Primary */}
         <BounceButton onPress={handleGoogleSignIn} disabled={googleLoading}>
@@ -403,7 +571,9 @@ export default function OnboardingScreen({ navigation }) {
             {googleLoading ? <ActivityIndicator color="#000" /> : (
               <>
                 <Text style={{ fontSize: 20, fontWeight: '900', color: '#1A1A1A' }}>G</Text>
-                <Text style={[typography.button, { color: '#1A1A1A' }]}>Continue with Google</Text>
+                <Text style={[typography.button, { color: '#1A1A1A' }]}>
+                  {isLogin ? 'Log in with Google' : 'Continue with Google'}
+                </Text>
               </>
             )}
           </View>
@@ -426,20 +596,44 @@ export default function OnboardingScreen({ navigation }) {
         {/* Email Secondary */}
         {showEmailForm ? (
           <Animated.View entering={FadeIn} style={{ gap: 12 }}>
-            <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-            <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Email" 
+              value={email} 
+              onChangeText={setEmail} 
+              autoCapitalize="none" 
+              keyboardType="email-address" 
+              onFocus={() => setTimeout(() => scrollViewRef3.current?.scrollToEnd({ animated: true }), 100)}
+            />
+            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', paddingVertical: 0, paddingHorizontal: 0 }]}>
+              <TextInput 
+                style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15 }} 
+                placeholder="Password" 
+                value={password} 
+                onChangeText={setPassword} 
+                secureTextEntry={!showPassword} 
+                onFocus={() => setTimeout(() => scrollViewRef3.current?.scrollToEnd({ animated: true }), 100)}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+                <Feather name={showPassword ? "eye" : "eye-off"} size={20} color={colors.text.hint} />
+              </TouchableOpacity>
+            </View>
             <BounceButton onPress={handleEmailAuth} disabled={authLoading}>
               <View style={[styles.socialBtn, { backgroundColor: colors.bg.secondary }]}>
-                {authLoading ? <ActivityIndicator color={colors.text.primary} /> : <Text style={[typography.button, { color: colors.text.primary }]}>Sign In with Email</Text>}
+                {authLoading ? <ActivityIndicator color={colors.text.primary} /> : <Text style={[typography.button, { color: colors.text.primary }]}>{isLogin ? 'Log In' : 'Sign Up'}</Text>}
               </View>
             </BounceButton>
           </Animated.View>
         ) : (
-          <TouchableOpacity onPress={() => setShowEmailForm(true)} style={{ paddingVertical: 10 }}>
+          <TouchableOpacity onPress={() => {
+            setShowEmailForm(true);
+            setTimeout(() => scrollViewRef3.current?.scrollToEnd({ animated: true }), 100);
+          }} style={{ paddingVertical: 10 }}>
             <Text style={[typography.label, { color: colors.text.hint, textAlign: 'center' }]}>Prefer email and password?</Text>
           </TouchableOpacity>
         )}
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 
@@ -455,32 +649,149 @@ export default function OnboardingScreen({ navigation }) {
       );
     }
     return (
-      <Animated.View entering={SlideInRight.springify()} exiting={SlideOutLeft} style={styles.stepContainer}>
+      <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
         <View style={{ flex: 1, justifyContent: 'center', gap: 24 }}>
           <Text style={[typography.display, { color: colors.text.primary }]}>Do you have a CV ready?</Text>
           <Text style={[typography.body, { color: colors.text.secondary }]}>Upload it to let our AI build your profile instantly. Otherwise, we can guide you through it.</Text>
           
           <StaggeredList baseDelay={100} style={{ gap: 16 }}>
             <SelectionCard emoji="📄" label="Yes, upload CV" desc="PDF or Word. Auto-extracts profile." colorTheme="rgba(255, 107, 44, 0.08)" onPress={handleFileUpload} />
-            <SelectionCard emoji="✏️" label="No, build it now" desc="Quick 3-step guided form." colorTheme="rgba(123, 79, 233, 0.08)" onPress={() => setStep(4.5)} />
+            <SelectionCard emoji="✏️" label="No, build it now" desc="Quick guided wizard." colorTheme="rgba(123, 79, 233, 0.08)" onPress={() => changeStep(4.1)} />
           </StaggeredList>
         </View>
       </Animated.View>
     );
   };
 
-  // Step 4.5: Guided Form
-  const renderStep5 = () => (
-    <Animated.View entering={SlideInRight.springify()} exiting={SlideOutLeft} style={styles.stepContainer}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+  // Step 4.1: Basic Identity
+  const renderStep4_1 = () => (
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20 }} showsVerticalScrollIndicator={false}>
-          <Text style={[typography.display, { color: colors.text.primary }]}>Let's build your profile.</Text>
+          <Text style={[typography.display, { color: colors.text.primary }]}>Let's start with the basics.</Text>
+          <Text style={[typography.body, { color: colors.text.secondary }]}>Takes 2 minutes, promise.</Text>
           
           <AnimatedInput label="Full Name" placeholder="e.g. Alex Smith" value={profileData.user_name} onChangeText={(text) => setProfileData(prev => ({...prev, user_name: text}))} />
-          <AnimatedInput label="Target Role" placeholder="e.g. Frontend Engineer" value={profileData.job_type} onChangeText={(text) => setProfileData(prev => ({...prev, job_type: text}))} />
-          <AnimatedInput label="Experience Level" placeholder="e.g. Mid-Level (3-5 years)" value={profileData.experience_level} onChangeText={(text) => setProfileData(prev => ({...prev, experience_level: text}))} />
+          <AnimatedInput label="Phone Number" placeholder="e.g. +1 555 123 4567" value={profileData.phone} onChangeText={(text) => setProfileData(prev => ({...prev, phone: text}))} keyboardType="phone-pad" />
+          <AnimatedInput label="Email" placeholder="e.g. alex@example.com" value={profileData.email} onChangeText={(text) => setProfileData(prev => ({...prev, email: text}))} keyboardType="email-address" autoCapitalize="none" />
+          <AnimatedInput label="Location" placeholder="e.g. San Francisco, CA" value={profileData.location} onChangeText={(text) => setProfileData(prev => ({...prev, location: text}))} />
           
-          <BounceButton onPress={handleGuidedFormSubmit}>
+          <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); changeStep(4.2); }}>
+            <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
+              <Text style={[typography.button, { color: '#fff' }]}>Continue</Text>
+            </LinearGradient>
+          </BounceButton>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+
+  // Step 4.2: Career Snapshot
+  const renderStep4_2 = () => (
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20 }} showsVerticalScrollIndicator={false}>
+          <Text style={[typography.display, { color: colors.text.primary }]}>What are you aiming for?</Text>
+          
+          <AnimatedInput label="Target Role" placeholder="e.g. Software Engineer" value={profileData.job_type} onChangeText={(text) => setProfileData(prev => ({...prev, job_type: text}))} />
+          <AnimatedInput label="Industry" placeholder="e.g. Tech, Finance" value={profileData.industry} onChangeText={(text) => setProfileData(prev => ({...prev, industry: text}))} />
+          
+          <Text style={[typography.label, { color: colors.text.secondary }]}>Experience Level</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {['Entry (0-2)', 'Mid (3-6)', 'Senior (7+)'].map(level => (
+              <BounceButton key={level} onPress={() => setProfileData(prev => ({...prev, experience_level: level}))} style={{ flex: 1 }}>
+                <View style={[styles.skillChip, { backgroundColor: profileData.experience_level === level ? colors.brand.orange : colors.bg.secondary, borderRadius: radii.full, alignItems: 'center' }]}>
+                  <Text style={[typography.label, { color: profileData.experience_level === level ? '#fff' : colors.text.primary }]}>{level}</Text>
+                </View>
+              </BounceButton>
+            ))}
+          </View>
+          
+          <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); changeStep(4.3); }}>
+            <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
+              <Text style={[typography.button, { color: '#fff' }]}>Continue</Text>
+            </LinearGradient>
+          </BounceButton>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+
+  // Step 4.3: Work History
+  const renderStep4_3 = () => (
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20 }} showsVerticalScrollIndicator={false}>
+          <Text style={[typography.display, { color: colors.text.primary }]}>Tell us about your latest role.</Text>
+          
+          <AnimatedInput label="Company Name" placeholder="e.g. Acme Corp" value={profileData.company} onChangeText={(text) => setProfileData(prev => ({...prev, company: text}))} />
+          <AnimatedInput label="Role Title" placeholder="e.g. Product Manager" value={profileData.role_title} onChangeText={(text) => setProfileData(prev => ({...prev, role_title: text}))} />
+          
+          <Text style={[typography.label, { color: colors.text.secondary }]}>Your biggest wins</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            placeholder="I built [X] which resulted in [Y]..."
+            value={profileData.work_wins}
+            onChangeText={(text) => setProfileData(prev => ({...prev, work_wins: text}))}
+            multiline
+          />
+          
+          <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); changeStep(4.4); }}>
+            <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
+              <Text style={[typography.button, { color: '#fff' }]}>Continue</Text>
+            </LinearGradient>
+          </BounceButton>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+
+  // Step 4.4: Skills
+  const renderStep4_4 = () => (
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20 }} showsVerticalScrollIndicator={false}>
+          <Text style={[typography.display, { color: colors.text.primary }]}>What are your superpowers?</Text>
+          <Text style={[typography.body, { color: colors.text.secondary }]}>Enter your top skills (comma separated).</Text>
+          
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            placeholder="e.g. React Native, UI/UX Design, Agile"
+            value={profileData.skills.join(', ')}
+            onChangeText={(text) => setProfileData(prev => ({...prev, skills: text.split(',').map(s => s.trim()).filter(Boolean)}))}
+            multiline
+          />
+          
+          <BounceButton onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); changeStep(4.5); }}>
+            <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
+              <Text style={[typography.button, { color: '#fff' }]}>Continue</Text>
+            </LinearGradient>
+          </BounceButton>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Animated.View>
+  );
+
+  // Step 4.5: Tone & Finalize
+  const renderStep4_5 = () => (
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 20}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 20 }} showsVerticalScrollIndicator={false}>
+          <Text style={[typography.display, { color: colors.text.primary }]}>How should we sound?</Text>
+          
+          <View style={{ gap: 12 }}>
+            {['Professional & Direct', 'Creative & Bold', 'Friendly & Approachable'].map(tone => (
+              <BounceButton key={tone} onPress={() => setProfileData(prev => ({...prev, tone_format: tone}))}>
+                <View style={[styles.card, { borderRadius: radii.xl, backgroundColor: profileData.tone_format === tone ? 'rgba(255, 107, 44, 0.1)' : colors.bg.card, borderColor: profileData.tone_format === tone ? colors.brand.orange : colors.border.light }]}>
+                  <Text style={[typography.title, { color: profileData.tone_format === tone ? colors.brand.orange : colors.text.primary }]}>{tone}</Text>
+                </View>
+              </BounceButton>
+            ))}
+          </View>
+          
+          <AnimatedInput label="Any Career Gaps? (Optional)" placeholder="e.g. Took a year off to travel" value={profileData.gaps} onChangeText={(text) => setProfileData(prev => ({...prev, gaps: text}))} />
+          
+          <BounceButton onPress={generateProfileWithAI}>
             <LinearGradient colors={[colors.brand.orange, colors.brand.mango]} style={styles.primaryBtn} start={{x:0, y:0}} end={{x:1, y:1}}>
               <Text style={[typography.button, { color: '#fff' }]}>Generate Profile ✨</Text>
             </LinearGradient>
@@ -490,9 +801,18 @@ export default function OnboardingScreen({ navigation }) {
     </Animated.View>
   );
 
+  // Step 4.6: Loading AI
+  const renderStep4_6 = () => (
+    <Animated.View entering={FadeIn} style={[styles.stepContainer, { justifyContent: 'center', alignItems: 'center', gap: 20 }]}>
+      <ActivityIndicator size="large" color={colors.brand.orange} />
+      <Text style={[typography.title, { color: colors.text.primary }]}>Gemini AI is crafting your CV...</Text>
+      <Text style={[typography.label, { color: colors.text.secondary, textAlign: 'center' }]}>Synthesizing your experience into a{'\n'}professional profile.</Text>
+    </Animated.View>
+  );
+
   // Step 5: Profile Validation
   const renderStep6 = () => (
-    <Animated.View entering={SlideInRight.springify()} exiting={SlideOutLeft} style={styles.stepContainer}>
+    <Animated.View entering={enteringAnim} exiting={exitingAnim} style={styles.stepContainer}>
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingVertical: 20, gap: 24 }} showsVerticalScrollIndicator={false}>
         <Text style={[typography.display, { color: colors.text.primary }]}>Here's what we got.</Text>
         <Text style={[typography.body, { color: colors.text.secondary }]}>Review your profile before launching.</Text>
@@ -549,7 +869,12 @@ export default function OnboardingScreen({ navigation }) {
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
-        {step === 4.5 && renderStep5()}
+        {step === 4.1 && renderStep4_1()}
+        {step === 4.2 && renderStep4_2()}
+        {step === 4.3 && renderStep4_3()}
+        {step === 4.4 && renderStep4_4()}
+        {step === 4.5 && renderStep4_5()}
+        {step === 4.6 && renderStep4_6()}
         {step === 5 && renderStep6()}
       </View>
     </View>

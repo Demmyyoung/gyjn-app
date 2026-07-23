@@ -37,6 +37,7 @@ import ProfileScreen   from "./src/screens/ProfileScreen";
 import EmployerScreen  from "./src/screens/EmployerScreen";
 import ChatScreen      from "./src/screens/ChatScreen";
 import SettingsScreen  from "./src/screens/SettingsScreen";
+import PremiumScreen   from "./src/screens/PremiumScreen";
 import { GlobalNotificationHandler } from "./src/lib/usePushNotifications";
 
 // ── React Query client ────────────────────────────────────────────────────────
@@ -334,6 +335,11 @@ export default Sentry.wrap(function App() {
                     name="Settings"
                     component={SettingsScreen}
                     options={{ animation: "slide_from_right" }}
+                  />
+                  <Stack.Screen
+                    name="Premium"
+                    component={PremiumScreen}
+                    options={{ presentation: "modal" }}
                   />
               </Stack.Navigator>
             </NavigationContainer>
